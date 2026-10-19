@@ -33,12 +33,35 @@ This adapts the old first-account and delayed-return mechanisms, rather than
 copying its whole qlaunch replacement. Native qlaunch honored the user-aware
 request without showing a selector in the bounded device check.
 
+## Launch from an occupied Breeze slot
+
+The verified device launch began at stock HOME without an existing NRO. A later
+start from a retained Breeze reached qlaunch's application accessor but never
+reached Start; NSHome's tracker expired. This is not evidence of a game crash.
+
+The new preflight is offline-tested only. With no game running, an identified
+Breeze gets one normal HOME handoff. For NSHome's own matching holder, NSHome
+also requests a normal exit; it never forces termination. It waits up to five
+seconds for the Album session/library slot to close and qlaunch to regain focus
+before submitting the native game request. Unknown NROs or other library applets
+are rejected as busy. Session changes, failed IPC or a handoff timeout prevent
+submission. The process guard runs again after the handoff.
+
+Numeric log stages 76/79 identify HOME/owned-holder exit requests; 77 confirms
+handoff readiness and 78 records preflight failure. Stage 61 follows only after
+preflight succeeds. No StopNRO command or generic NRO manager is added.
+
+A tracker timeout does not withdraw an application accessor already handed to
+qlaunch. It can still start after a later native UI transition. Do not replay a
+failed/ambiguous start without checking the actual game process and screen.
+
 ## Breeze return
 
 After the matching Start succeeds, wait two seconds. Reuse an identified live
 Breeze if available. Otherwise wait for game startup applets and other library
 applets/NROs to finish; do not forcibly close another NRO. Retry availability
-every two seconds, within a 30-second transaction deadline.
+every two seconds, within 30 seconds after the observed application Start.
+The preceding native Start wait is separately bounded to 30 seconds.
 
 A dedicated nx-hbloader build loads `sdmc:/switch/Breeze/Breeze.nro` as an
 Album applet. It first initializes in the foreground for compatibility, then

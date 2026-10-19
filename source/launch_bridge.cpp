@@ -2,6 +2,7 @@
 // SwitchU first-account / delayed Breeze return policy, applied to stock qlaunch.
 #include "launch_bridge.hpp"
 #include "launch_policy.hpp"
+#include "launch_handoff.hpp"
 #include "launch_storage.hpp"
 #include "launch_ecs.hpp"
 #include "loader_receipt.h"
@@ -132,6 +133,56 @@ bool receipt(NshLoaderReceipt& value) {
     std::fclose(file);
     return ok && value.magic == 0x4c48534e && value.version == 1 && value.path[511] == 0;
 }
+Result launch_handoff(Connection& c, Service& owned_holder, std::uint64_t owned_generation) {
+    const auto snapshot = [&](HandoffSnapshot& out) {
+        { std::scoped_lock lock(mutex);
+          out.epoch = qepoch;
+          const auto* a = latest_album();
+          out.album = a ? a->generation : 0;
+          out.identified = a && a->generation == proven; }
+        u8 active = 1, focus = 0;
+        auto rc = serviceDispatchOut(&c.creator, 2, active);
+        if (R_SUCCEEDED(rc)) rc = serviceDispatchOut(&c.common, 9, focus);
+        out.library_active = active != 0;
+        out.qlaunch_in_focus = focus == AppletFocusState_InFocus;
+        return rc;
+    };
+    HandoffSnapshot current{};
+    auto rc = snapshot(current);
+    if (R_FAILED(rc)) return rc;
+    if (current.epoch != c.epoch) return Cancelled;
+    Handoff handoff(current, now());
+    for (;;) {
+        switch (handoff.next(current, now())) {
+            case HandoffAction::Ready: startup(77); return 0;
+            case HandoffAction::Busy: return Busy;
+            case HandoffAction::Cancelled: return Cancelled;
+            case HandoffAction::TimedOut: return KERNELRESULT(TimedOut);
+            case HandoffAction::Home: {
+                // Our own retained holder is not in qlaunch's UI bookkeeping.
+                // Ask it to exit normally; native qlaunch handles other holders.
+                // Never terminate a holder or close an unknown NRO here.
+                (void)home::command("home off");
+                if (owned_generation == current.album && serviceIsActive(&owned_holder)) {
+                    bool done = false;
+                    rc = complete(&owned_holder, done);
+                    if (R_SUCCEEDED(rc) && !done) rc = serviceDispatch(&owned_holder, 20);
+                    startup(79, rc);
+                    if (R_FAILED(rc)) return rc;
+                }
+                const u32 button = AppletSystemButtonType_HomeButtonShortPressing;
+                rc = serviceDispatchIn(&c.debug, 10, button);
+                startup(76, rc);
+                if (R_FAILED(rc)) return rc;
+                break;
+            }
+            case HandoffAction::Wait: break;
+        }
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+        rc = snapshot(current);
+        if (R_FAILED(rc)) return rc;
+    }
+}
 Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     if (!valid_nro()) return NotReady;
     // Match the upstream foreground applet runner. An AllForeground child
@@ -181,9 +232,9 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
 void worker(void*) {
     Connection connection;
     Service holder{};
-    std::uint64_t ticket = 0;
+    std::uint64_t ticket = 0, holder_generation = 0;
     for (;;) {
-        const auto time = now();
+        auto time = now();
         const auto connected = connection.open();
         nshome::remote::Request request;
         if (nshome::remote::take(request)) {
@@ -191,6 +242,14 @@ void worker(void*) {
             User selected{};
             if (R_SUCCEEDED(rc)) rc = no_running_game();
             if (R_SUCCEEDED(rc)) rc = first_account(selected);
+            if (R_SUCCEEDED(rc)) {
+                rc = launch_handoff(connection, holder, holder_generation);
+                if (R_FAILED(rc)) startup(78, rc);
+            }
+            // HOME can release an older native pending launch. Never submit a
+            // second launch if a game appeared while qlaunch reclaimed focus.
+            if (R_SUCCEEDED(rc)) rc = no_running_game();
+            time = now();
             if (R_SUCCEEDED(rc)) {
                 std::scoped_lock lock(mutex);
                 if (current_application) {
@@ -222,7 +281,7 @@ void worker(void*) {
             bool done = false;
             const auto rc = complete(&holder, done);
             if (R_SUCCEEDED(rc) && done) {
-                serviceClose(&holder); (void)unregister_loader();
+                serviceClose(&holder); holder_generation = 0; (void)unregister_loader();
                 std::scoped_lock lock(mutex); policy.retry_restore(time);
             }
         }
@@ -240,6 +299,7 @@ void worker(void*) {
                     if (R_SUCCEEDED(rc)) rc = serviceDispatch(&game, 101);
                     startup(74, rc);
                     if (R_SUCCEEDED(rc) && home::identify_breeze(generation, true)) {
+                        holder_generation = generation;
                         std::scoped_lock lock(mutex); policy.ready(connection.epoch, generation, true);
                         startup(65, 0, static_cast<std::uint32_t>(generation));
                     }
@@ -267,7 +327,7 @@ void worker(void*) {
                 rc = open_breeze(connection, holder, ticket);
                 startup(64, rc);
                 std::scoped_lock lock(mutex);
-                if (R_FAILED(rc)) policy.retry_restore(time);
+                if (R_FAILED(rc)) { holder_generation = 0; policy.retry_restore(time); }
               } else {
                 std::scoped_lock lock(mutex);
                 if (done) policy.cancel(); else policy.retry(time);
@@ -281,7 +341,7 @@ void worker(void*) {
         // Finished holders are released without terminating an active replacement NRO.
         if (serviceIsActive(&holder) && !state.pending()) {
             bool done = false;
-            if (R_SUCCEEDED(complete(&holder, done)) && done) { serviceClose(&holder); (void)unregister_loader(); }
+            if (R_SUCCEEDED(complete(&holder, done)) && done) { serviceClose(&holder); holder_generation = 0; (void)unregister_loader(); }
         }
         if (!signalled.exchange(false)) ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(100));
     }
