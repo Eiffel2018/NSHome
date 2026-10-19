@@ -9,7 +9,7 @@ inline Result child(Service* parent, std::uint32_t command, Service* out) {
     return serviceDispatch(parent, command, .out_num_objects = 1, .out_objects = out);
 }
 inline Result push_storage(Service* creator, Service* destination, std::uint32_t command,
-                           const void* data, std::size_t size, bool user = false) {
+                           const void* data, std::size_t size) {
     Service storage{}, accessor{};
     const s64 length = size;
     auto rc = serviceDispatchIn(creator, 10, length, .out_num_objects = 1, .out_objects = &storage);
@@ -18,12 +18,7 @@ inline Result push_storage(Service* creator, Service* destination, std::uint32_t
     if (R_SUCCEEDED(rc)) rc = serviceDispatchIn(&accessor, 10, offset,
         .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In }, .buffers = { {data, size} });
     if (serviceIsActive(&accessor)) serviceClose(&accessor);
-    if (R_SUCCEEDED(rc)) {
-        if (user) {
-            const u32 kind = AppletLaunchParameterKind_PreselectedUser;
-            rc = serviceDispatchIn(destination, command, kind, .in_num_objects = 1, .in_objects = { &storage });
-        } else rc = serviceDispatch(destination, command, .in_num_objects = 1, .in_objects = { &storage });
-    }
+    if (R_SUCCEEDED(rc)) rc = serviceDispatch(destination, command, .in_num_objects = 1, .in_objects = { &storage });
     if (serviceIsActive(&storage)) serviceClose(&storage);
     return rc;
 }

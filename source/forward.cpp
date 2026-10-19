@@ -3,7 +3,6 @@
 #include "home_bridge.hpp"
 #include "boot.hpp"
 #include "launch_bridge.hpp"
-#include "launch_reply.hpp"
 #include <algorithm>
 
 using Session = ams::sf::hipc::ServerSession;
@@ -63,14 +62,9 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
         if (hipcGetBufferSize(&descriptor) >= 16) storage_output = static_cast<const std::uint8_t*>(hipcGetBufferAddress(&descriptor));
     }
 
-    std::uint32_t replaced_result = 0;
-    if (observer::launch::intercept(session, interface, request, replaced_result)) {
-        observer::launch::make_reply(ams::sf::hipc::GetMessageBufferOnTls(), request.domain, replaced_result, request.token);
-        record.result = replaced_result; record.flags |= 0x1000;
-        observer::push(record);
-        return ams::ResultSuccess();
-    }
-    // All other requests are forwarded exactly once. Message 50 remains stock.
+    observer::launch::before_forward(session, interface, request);
+    // All application commands are forwarded exactly once. qlaunch supplies
+    // its own user parameter after the native user-aware debug launch request.
     const auto transport = real_forward(session, ctx);
     record.transport = transport.GetValue();
     if (R_SUCCEEDED(transport) && request.closing) {

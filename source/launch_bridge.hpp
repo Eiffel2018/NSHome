@@ -9,8 +9,7 @@ void wake();
 void network_tick(const char* pairing_code); // Called only by the BSD-owning 6802 worker.
 void register_root(const std::shared_ptr<::Service>& forward, std::uint64_t pid, bool qlaunch);
 void bind_root(const void* session, std::uint64_t pid);
-// Only a PC6802-bound Start can be rejected if preselection fails.
-// 6801/manual launches retain native profile selection and lifecycle.
-bool intercept(const void* session, Kind kind, const Request& request, std::uint32_t& result);
+// Observe launch provenance without replacing qlaunch's application commands.
+void before_forward(const void* session, Kind kind, const Request& request);
 void observe(const void* session, Kind kind, const Request& request, const Reply& reply);
 }

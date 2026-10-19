@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "launch_policy.hpp"
-#include "launch_reply.hpp"
 #include <cassert>
 #include <cstdio>
 using namespace observer::launch;
@@ -48,26 +47,10 @@ int main() {
         assert(p.begin(origin, 6, 0x1234, 2, user, 44000));
         p.fail(0x1234); assert(p.phase == Phase::Failed && p.result == 0x1234);
     }
-    const auto parameter = preselected_user(user);
-    assert(observer::word(parameter.data()) == 0xc79497ca);
-    assert(parameter[4] == 1 && parameter[5] == 0 && parameter[7] == 0);
-    assert(std::memcmp(parameter.data() + 8, &user, sizeof(user)) == 0);
-    for (std::size_t i = 24; i < parameter.size(); ++i) assert(parameter[i] == 0);
     assert(is_breeze_state("+OK {\"breeze\":\"beta125.05\",\"menu\":{}}"));
     assert(is_breeze_state("+OK {\"breeze\": \"beta125.05\"}"));
     for (const auto invalid : {"-ERR busy", "+OK {}", "+OK {\"menu\":{\"breeze\":\"beta125.05\"}}",
             "+OK {\"breeze\":\"beta\"}", "+OK {\"breeze\":\"beta125\\n\"}",
             "+OK {\"breeze\":\"beta125.05", "+OK {\"breeze\":\"beta125.05\"x}"}) assert(!is_breeze_state(invalid));
-    // Replaced replies preserve the CMIF token, no object/handle descriptors.
-    alignas(16) std::array<std::uint8_t, 0x100> tls;
-    for (bool domain : {false, true}) {
-        make_reply(tls.data(), domain, 0x1234, 0x5678);
-        assert(observer::word(tls.data()) == 0);
-        assert(observer::word(tls.data() + 4) == (domain ? 12U : 8U));
-        const auto* payload = tls.data() + 16;
-        const auto parsed = observer::reply(payload, domain ? 32 : 16, domain, false);
-        assert(parsed.valid && parsed.result == 0x1234 && parsed.count == 0);
-        assert(observer::word(payload + (domain ? 16 : 0) + 12) == 0x5678);
-    }
-    std::puts("launch policy, source fencing, preselected-user payload and replacement reply tests passed");
+    std::puts("launch policy, source fencing and Breeze identity tests passed");
 }

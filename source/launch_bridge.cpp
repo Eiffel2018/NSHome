@@ -287,33 +287,18 @@ void bind_root(const void* session, std::uint64_t pid) {
     }
     if (candidate) candidate->session = session;
 }
-bool intercept(const void* session, Kind kind, const Request& request, std::uint32_t& result) {
-    if (request.closing || !request.valid) return false;
+void before_forward(const void* session, Kind kind, const Request& request) {
+    if (request.closing || !request.valid) return;
     std::scoped_lock lock(mutex);
-    if (!enabled) return false;
+    if (!enabled) return;
     Root* source = nullptr;
     for (auto& r : roots) if (r.session == session && !r.service.expired()) source = &r;
-    if (!source) return false;
+    if (!source) return;
     if (kind == Kind::LibrarySelf && request.command == 90 && !source->qlaunch) {
         // A 6801/manual applet launch supersedes the PC transaction. Its native
         // profile selection and lifecycle remain entirely stock.
         policy.cancel();
-        return false;
     }
-    if (source->qlaunch && kind == Kind::Application && request.command == 10 &&
-        policy.phase == Phase::Requested && request.object == policy.application) {
-        SavedTls tls;
-        auto root = source->service.lock(); auto proxy = borrowed(*root, source->proxy);
-        Service creator{};
-        result = child(&proxy, 11, &creator);
-        auto app = borrowed(*root, request.object);
-        const auto data = preselected_user(policy.user);
-        if (R_SUCCEEDED(result)) result = push_storage(&creator, &app, 121, data.data(), data.size(), true);
-        if (serviceIsActive(&creator)) serviceClose(&creator);
-        startup(62, result);
-        if (R_FAILED(result)) { policy.fail(result); return true; }
-    }
-    return false;
 }
 void observe(const void* session, Kind kind, const Request& request, const Reply& reply) {
     std::scoped_lock lock(mutex);
@@ -353,6 +338,8 @@ void observe(const void* session, Kind kind, const Request& request, const Reply
     if (kind == Kind::Application && policy.phase == Phase::Requested && request.object == policy.application && request.command == 10) {
         policy.started(request.object, now()); startup(63);
     }
+    if (kind == Kind::Application && policy.phase == Phase::Requested && request.object == policy.application && request.command == 121)
+        startup(62, 0, request.argument); // qlaunch owns the launch parameter.
     if (kind == Kind::Application && request.object == policy.application &&
         (request.command == 20 || request.command == 25 || request.command == 30 || (request.command == 1 && reply.scalar))) policy.cancel();
 }

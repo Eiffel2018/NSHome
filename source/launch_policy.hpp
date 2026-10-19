@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Timing/source policy adapted from SwitchU 546903f6, breeze_launch_handoff.hpp.
 #pragma once
-#include <array>
 #include <cstdint>
-#include <cstring>
 #include <string_view>
 
 namespace observer::launch {
@@ -63,15 +61,6 @@ public:
     }
 };
 
-// Exact 0x88 ABI used by SwitchU's application start and libnx account startup.
-inline std::array<std::uint8_t, 0x88> preselected_user(User uid) {
-    std::array<std::uint8_t, 0x88> data{};
-    const std::uint32_t magic = 0xc79497ca;
-    std::memcpy(data.data(), &magic, sizeof(magic));
-    data[4] = 1;
-    std::memcpy(data.data() + 8, &uid, sizeof(uid));
-    return data;
-}
 inline bool is_breeze_state(std::string_view reply) {
     constexpr std::string_view prefix = "+OK {\"breeze\":";
     if (reply.substr(0, prefix.size()) != prefix) return false;

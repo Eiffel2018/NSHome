@@ -15,9 +15,9 @@ Dependencies / provenance:
 - Atmosphere-NX/Atmosphere-libs aae2da0155a490abd3bfd17a70ccd16bb73c916a,
   GPL-2.0: IPC MITM server, original forwarding, domain and PID handling.
   No dependency source files are modified. The diagnostic uses a link wrapper
-  around ServerSession::ForwardRequest. Unrelated requests relay exactly once;
-  a failed preselection for a scoped PC6802 launch can reject Start before
-  it reaches AM. 6801 and manual launch requests retain their native behavior.
+  around ServerSession::ForwardRequest. Application commands relay exactly
+  once, including qlaunch's own user parameter and Start. 6801 and manual
+  launch requests retain their native behavior.
 - switchbrew/libnx 20cbcfd90567f7bf84df7725f27e345e2164fa6b, ISC: HIPC/CMIF
   definitions, kernel and service client functions, including the native
   user-aware debug launch request sent in the existing qlaunch context.

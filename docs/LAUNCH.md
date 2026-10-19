@@ -1,7 +1,8 @@
 # PC game launch candidate (0.1.8)
 
-This is an offline-built implementation, not a hardware acceptance claim or a
-published release. Stock qlaunch remains installed and owns applications.
+This is a development candidate, not a published release. The first device
+revision failed during duplicate user-parameter injection; that injection has
+been removed. The revised game launch and Breeze return await device acceptance. Stock qlaunch remains installed and owns applications.
 
 ## Origin and behavior
 
@@ -18,10 +19,10 @@ SwitchU's PC launch policy. An empty account list or running game is rejected
 the module does not terminate a game to replace it. It sends the native
 `IDebugFunctions::RequestLaunchApplicationWithUserAndArgumentForDebug` request
 through a cloned qlaunch session, with that UID and no user launch payload.
-Stock qlaunch receives its normal messages (message 50 is never swallowed), and creates
-the application. Immediately before that transaction's Start, NSHome supplies
-the same 0x88-byte `PreselectedUser` ABI used by the old launcher. Preselection
-failure rejects this Start rather than silently claiming automatic selection.
+Stock qlaunch receives its normal messages (message 50 is never swallowed),
+creates the application and supplies its own selected-user launch parameter.
+NSHome forwards these application commands unchanged; it does not inject a
+second parameter or replace Start replies.
 
 This adapts the old first-account and delayed-return mechanisms, rather than
 copying its whole qlaunch replacement. Native qlaunch honoring the user-aware
@@ -60,9 +61,9 @@ the game and that exact resident Breeze generation without a PC `home arm` call.
 The native request APIs require modern firmware (the candidate targets the
 existing test environment); general firmware compatibility is not established.
 
-Host tests cover PC intent versus manual starts, exact user argument bytes,
-request/session/accessor fencing, timing, cancellation, bounded retries, reply
-framing and adopted HOME sessions. Compilation verifies AArch64 module/loader
+Host tests cover PC intent versus manual starts, request/session/accessor fencing,
+timing, cancellation, bounded retries and adopted HOME sessions.
+Compilation verifies AArch64 module/loader
 containers and program IDs. These tests do not emulate proprietary qlaunch.
 
 Required device checks include first-user selection with multiple accounts,
