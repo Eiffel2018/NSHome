@@ -8,3 +8,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash tests/run.sh
+      - run: python3 -m unittest discover -s tests -p '*_test.py'

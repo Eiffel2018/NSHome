@@ -24,8 +24,12 @@ files = {
     'LICENSE': (root / 'LICENSE').read_bytes(),
     'verification.json': (build / 'verification.json').read_bytes(),
 }
+# Include the runnable PC samples alongside their shared client and reference.
+for pattern in ('samples/*.py', 'samples/*.md', 'tools/nshome_remote.py', 'docs/REMOTE_6802.md'):
+    for path in root.glob(pattern):
+        files[path.relative_to(root).as_posix()] = path.read_bytes()
 # Include corresponding module source and the pinned dependency build recipe.
-for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md'):
+for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/*.py', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md', 'tools/nshome_remote.py', 'samples/*.py', 'samples/*.md'):
     for path in root.glob(pattern):
         if path.is_file():
             files['source/NSHome/' + path.relative_to(root).as_posix()] = path.read_bytes()

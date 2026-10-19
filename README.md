@@ -18,12 +18,21 @@ continuous trace and general exit/chainload behavior remain unfinished. Breeze
 UI/debug RPC can return busy while hidden. Stock qlaunch suspends the game while
 Breeze is in front. The 6802 NRO/game launch bridge is not implemented.
 
+## Python examples
+
+See the [complete TCP 6802 feature and parameter reference](docs/REMOTE_6802.md)
+and [17 runnable Python samples](samples/README.md). They cover authentication,
+status, input controls, buttons/chords, sticks, touch, JPEG capture and experimental
+HOME controls. NRO/game launch samples document the current unsupported response.
+Python 3.10+ and its standard library are sufficient.
+
 ## Build and test
 
 Host tests (Linux, g++ with ASan/UBSan):
 
 ```sh
 bash tests/run.sh
+python3 -m unittest discover -s tests -p '*_test.py'
 ```
 
 Switch build requires devkitPro/devkita64, libnx
