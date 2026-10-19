@@ -22,6 +22,9 @@ g++ "${flags[@]}" -Isource tests/breeze_background_test.cpp -o build/tests/breez
 build/tests/breeze_background
 g++ "${flags[@]}" -Itests/launch_storage_stub -Isource tests/launch_storage_test.cpp -o build/tests/launch_storage
 build/tests/launch_storage
+
+g++ "${flags[@]}" -Itests/launch_storage_stub -Isource tests/breeze_channel_test.cpp -o build/tests/breeze_channel
+build/tests/breeze_channel
 g++ "${flags[@]}" -Isource tests/codec_test.cpp -o build/tests/codec
 build/tests/codec
 for component in protocol input touch capture; do

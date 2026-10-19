@@ -5,6 +5,7 @@
 #include "launch_handoff.hpp"
 #include "launch_storage.hpp"
 #include "breeze_background.hpp"
+#include "breeze_channel.hpp"
 #include "launch_ecs.hpp"
 #include "loader_receipt.h"
 #include "home_bridge.hpp"
@@ -98,18 +99,7 @@ bool background_capable() {
     return background::capable(value, count);
 }
 Result pop_background(Service& holder, background::Message& message) {
-    Service storage{}, accessor{};
-    auto rc = child(&holder, 103, &storage); // PopInteractiveOutData
-    if (R_SUCCEEDED(rc)) rc = child(&storage, 0, &accessor);
-    s64 size = 0;
-    if (R_SUCCEEDED(rc)) rc = serviceDispatchOut(&accessor, 0, size);
-    if (R_SUCCEEDED(rc) && size != sizeof(message)) rc = NotReady;
-    const s64 offset = 0;
-    if (R_SUCCEEDED(rc)) rc = serviceDispatchIn(&accessor, 11, offset,
-        .buffer_attrs = { SfBufferAttr_HipcAutoSelect | SfBufferAttr_Out }, .buffers = { { &message, sizeof(message) } });
-    if (serviceIsActive(&accessor)) serviceClose(&accessor);
-    if (serviceIsActive(&storage)) serviceClose(&storage);
-    return rc;
+    return background::pop_message(holder, message);
 }
 bool background_current(const Connection& c, std::uint64_t generation) {
     std::scoped_lock lock(mutex);
@@ -120,7 +110,7 @@ Result send_background(Connection& c, Service& holder, std::uint64_t generation,
                        background::Command command, const home::Toggle* toggle = nullptr) {
     if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return Cancelled;
     const background::Message message{background::Magic, command, 0, 0};
-    auto rc = push_storage(&c.creator, &holder, 102, &message, sizeof(message));
+    auto rc = background::send_message(c.creator, holder, message);
     if (R_FAILED(rc)) return rc;
     const auto deadline = now() + 1500;
     while (now() < deadline) {
