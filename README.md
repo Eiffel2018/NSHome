@@ -5,8 +5,10 @@ qlaunch and switches HOME between a running game and the same resident Breeze.
 
 ## Download and install
 
-Download `NSHome-v0.1.9.zip` from the [0.1.9 release](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.9).
-Copy its `atmosphere` and `switch` folders to the SD root and reboot.
+The published preview is [0.1.8](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.8).
+Version 0.1.9 described below is source-only while HOME recovery is being verified.
+Source-built packages contain `atmosphere` and `switch`; copy both to the SD root
+and reboot. Use the published release's own instructions when installing 0.1.8.
 Read [installation and requirements](docs/INSTALL.md) first, including disabling
 an existing SwitchU HOME replacement. Breeze is installed separately.
 

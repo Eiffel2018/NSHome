@@ -147,20 +147,21 @@ void background_tick(Connection& c, Service& holder, std::uint64_t generation) {
         if (background::valid(reply) && reply.command == background::RequestForeground) home::request_foreground();
     }
     if (!home::take_toggle(value)) return;
-    auto rc = send_background(c, holder, generation,
+    bool library_done = true, game_done = true;
+    auto game = borrowed(c.connection, value.application);
+    auto rc = complete(&holder, library_done);
+    if (R_SUCCEEDED(rc)) rc = complete(&game, game_done);
+    if (R_SUCCEEDED(rc) && (library_done || game_done)) rc = NotReady;
+    // Normal rendering can need a visible applet window before its UI thread
+    // acknowledges the mode change. Give it foreground first; otherwise a
+    // depleted hidden buffer queue can deadlock EnterNormal's acknowledgement.
+    if (R_SUCCEEDED(rc) && value.game_front) rc = serviceDispatch(&c.functions, 10);
+    if (R_SUCCEEDED(rc)) rc = send_background(c, holder, generation,
         value.game_front ? background::EnterNormal : background::EnterHidden, &value);
     if (R_SUCCEEDED(rc) && !home::matches(value)) rc = Cancelled;
-    if (R_SUCCEEDED(rc)) {
-        bool library_done = true, game_done = true;
-        auto game = borrowed(c.connection, value.application);
-        rc = complete(&holder, library_done);
-        if (R_SUCCEEDED(rc)) rc = complete(&game, game_done);
-        if (R_SUCCEEDED(rc) && (library_done || game_done)) rc = NotReady;
-        if (R_SUCCEEDED(rc) && value.game_front) rc = serviceDispatch(&c.functions, 10);
-        else if (R_SUCCEEDED(rc)) {
+    if (R_SUCCEEDED(rc) && !value.game_front) {
             rc = serviceDispatch(&c.functions, 12);
             if (R_SUCCEEDED(rc)) rc = serviceDispatch(&game, 101);
-        }
     }
     startup(81, rc, value.game_front ? 4 : 1);
     // A failed hide leaves the native applet in front: restore its normal

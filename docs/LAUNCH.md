@@ -25,7 +25,8 @@ The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
 foreground, it sends EnterHidden and waits at most 5 seconds for its matching
 Ack. This stops Breeze rendering to the hidden applet window, which otherwise
-blocks its UI/debug loop. HOME back to the normal applet first uses EnterNormal.
+blocks its UI/debug loop. HOME back to the normal applet grants foreground before
+EnterNormal, so its renderer can acquire a visible-window buffer before acknowledging.
 Acknowledgements are handled by the launch worker after the AM relay responds,
 without holding relay locks. Session changes invalidate pending transitions;
 missing Acks disarm the pair without replaying a foreground request. The optional capability is
@@ -147,3 +148,8 @@ retained, and reopening Breeze with automatic HOME arming. A nonexistent path
 failed before replacing the current NRO. No save was loaded. An earlier candidate
 hit a receipt-file open failure; the loader now bounds retries of that metadata
 open before writing, without retrying the NRO launch itself.
+
+Release gate still open: a later HOME return after background idle timed out
+waiting for EnterNormal and disarmed the pair. The source now grants foreground
+before EnterNormal, but that recovery ordering still needs a device check.
+Version 0.1.9 has not been published.

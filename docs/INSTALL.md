@@ -1,7 +1,9 @@
-# NSHome 0.1.9 installation
+# NSHome 0.1.9 source-build installation
 
 Experimental release, tested on one console with Breeze beta125.05 and gen2 v0.20.
 Other firmware/game combinations are not yet verified.
+There is no public 0.1.9 release yet: recovery of HOME after background idle
+is still being verified. The instructions below describe source-built packages.
 
 ## Requirements and installation
 
