@@ -54,11 +54,11 @@ struct SavedTls {
     ~SavedTls() { std::memcpy(ams::sf::hipc::GetMessageBufferOnTls(), bytes.data(), bytes.size()); }
 };
 struct Connection {
-    Service connection{}, proxy{}, creator{}, debug{};
+    Service connection{}, proxy{}, creator{}, debug{}, functions{};
     std::uint64_t epoch{};
     ~Connection() { close(); }
     void close() {
-        for (auto* s : { &debug, &creator }) if (serviceIsActive(s)) serviceClose(s);
+        for (auto* s : { &debug, &functions, &creator }) if (serviceIsActive(s)) serviceClose(s);
         if (serviceIsActive(&connection)) serviceClose(&connection);
         proxy = {}; epoch = 0;
     }
@@ -76,6 +76,7 @@ struct Connection {
             rc = child(&proxy, 11, &creator);
         }
         if (R_SUCCEEDED(rc)) rc = child(&proxy, 1000, &debug);
+        if (R_SUCCEEDED(rc)) rc = child(&proxy, 20, &functions);
         if (R_FAILED(rc)) close(); else epoch = generation;
         return rc;
     }
@@ -134,7 +135,9 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     if (!valid_nro() || !ticket_file(ticket)) return NotReady;
     auto rc = register_loader();
     if (R_FAILED(rc)) return rc;
-    const struct { u32 id, mode; } input{AppletId_LibraryAppletPhotoViewer, LibAppletMode_Background};
+    // Breeze needs a normal foreground initialization on the tested firmware.
+    // Resume the game only after its authenticated 6801 state is available.
+    const struct { u32 id, mode; } input{AppletId_LibraryAppletPhotoViewer, LibAppletMode_AllForeground};
     rc = serviceDispatchIn(&c.creator, 0, input, .out_num_objects = 1, .out_objects = &holder);
     startup(70, rc);
     LibAppletArgs args{};
@@ -216,10 +219,16 @@ void worker(void*) {
                 std::strcmp(value.path, NSH_BREEZE_PATH) == 0) {
                 std::uint64_t generation = 0;
                 { std::scoped_lock lock(mutex); auto* a = latest_album();
-                  if (a && a->pid == value.pid) { generation = a->generation; proven = generation; } }
-                if (generation && home::identify_breeze(generation, true)) {
-                    std::scoped_lock lock(mutex); policy.ready(connection.epoch, generation);
-                    startup(65, 0, static_cast<std::uint32_t>(generation));
+                  if (a && a->pid == value.pid && a->generation == proven) generation = a->generation; }
+                if (generation) {
+                    auto game = borrowed(connection.connection, state.application);
+                    auto rc = serviceDispatch(&connection.functions, 12);
+                    if (R_SUCCEEDED(rc)) rc = serviceDispatch(&game, 101);
+                    startup(74, rc);
+                    if (R_SUCCEEDED(rc) && home::identify_breeze(generation, true)) {
+                        std::scoped_lock lock(mutex); policy.ready(connection.epoch, generation, true);
+                        startup(65, 0, static_cast<std::uint32_t>(generation));
+                    }
                 }
             }
         }
@@ -233,7 +242,7 @@ void worker(void*) {
             auto rc = complete(&game, done);
             if (R_SUCCEEDED(rc) && !done) rc = serviceDispatchOut(&game, 111, applets);
             if (R_SUCCEEDED(rc) && !done && existing_breeze && home::identify_breeze(existing_breeze, true)) {
-                std::scoped_lock lock(mutex); policy.ready(connection.epoch, existing_breeze);
+                std::scoped_lock lock(mutex); policy.ready(connection.epoch, existing_breeze, true);
             } else {
               if (R_SUCCEEDED(rc)) rc = serviceDispatchOut(&connection.creator, 2, global_applets);
               if (R_SUCCEEDED(rc) && !done && !applets && !global_applets && !occupied) {

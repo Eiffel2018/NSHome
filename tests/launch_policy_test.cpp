@@ -29,10 +29,11 @@ int main() {
         assert(!p.due(2199)); assert(p.due(2200));
         p.retry(2200); assert(!p.due(4199)); assert(p.due(4200));
         p.restoring(); assert(!p.due(4200));
-        p.ready(3, 8); assert(p.phase == Phase::Restoring);
-        p.ready(2, 0); assert(p.phase == Phase::Restoring);
+        p.ready(3, 8, true); assert(p.phase == Phase::Restoring);
+        p.ready(2, 0, true); assert(p.phase == Phase::Restoring);
+        p.ready(2, 8, false); assert(p.phase == Phase::Restoring); // mapped NRO alone is not readiness
         p.retry_restore(4500); assert(!p.due(6499)); assert(p.due(6500));
-        p.restoring(); p.ready(2, 8); assert(p.phase == Phase::Ready && p.generation == 8);
+        p.restoring(); p.ready(2, 8, true); assert(p.phase == Phase::Ready && p.generation == 8);
         assert(!p.pending());
         p.started(41, 10000); assert(p.phase == Phase::Ready && !p.due(999999));
         assert(p.begin(origin, 2, 0x1234, 2, user, 10000));

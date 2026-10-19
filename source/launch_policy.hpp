@@ -49,8 +49,8 @@ public:
     void retry(std::uint64_t now) { if (phase == Phase::Started) next = now + Retry; }
     void retry_restore(std::uint64_t now) { if (phase == Phase::Restoring) { phase = Phase::Started; next = now + Retry; } }
     void restoring() { if (phase == Phase::Started) phase = Phase::Restoring; }
-    void ready(std::uint64_t current, std::uint64_t album) {
-        if ((phase == Phase::Started || phase == Phase::Restoring) && current == epoch && album) {
+    void ready(std::uint64_t current, std::uint64_t album, bool endpoint_ready) {
+        if ((phase == Phase::Started || phase == Phase::Restoring) && current == epoch && album && endpoint_ready) {
             phase = Phase::Ready; generation = album;
         }
     }

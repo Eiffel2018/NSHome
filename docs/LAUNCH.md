@@ -2,7 +2,8 @@
 
 This is a development candidate, not a published release. The first device
 revision failed during duplicate user-parameter injection; that injection has
-been removed. The revised game launch and Breeze return await device acceptance. Stock qlaunch remains installed and owns applications.
+been removed. Native user selection and game launch have passed a bounded device test.
+The revised Breeze initialization and return await device acceptance. Stock qlaunch remains installed and owns applications.
 
 ## Origin and behavior
 
@@ -35,19 +36,22 @@ Breeze if available. Otherwise wait for game startup applets and other library
 applets/NROs to finish; do not forcibly close another NRO. Retry availability
 every two seconds, within a 30-second transaction deadline.
 
-A dedicated nx-hbloader build loads `sdmc:/switch/Breeze/Breeze.nro` as a
-background Album applet. Its external-content registration is scoped to this
-owned holder; the original qlaunch executable and persistent Album override are
-unchanged. A consumed one-shot ticket plus the mapped-path/PID receipt and a
-live AM root identify the new Breeze session before HOME switching is armed.
-An existing Breeze can be identified once through its authenticated local6801
-state response; that proof belongs to one AM generation, not all Album applets.
+A dedicated nx-hbloader build loads `sdmc:/switch/Breeze/Breeze.nro` as an
+Album applet. It first initializes in the foreground for compatibility, then
+NSHome resumes the game after authenticated local6801 state confirms Breeze
+is ready. A mapped NRO receipt alone is not sufficient. HOME is automatically
+armed only for that exact live AM generation.
+
+Its external-content registration is scoped to the owned holder; the original
+qlaunch executable and persistent Album override are unchanged. A consumed
+one-shot ticket plus the mapped-path/PID receipt binds the loader result to the
+new session. Existing Breeze reuse also requires authenticated local6801 proof.
+The first background-mode trial mapped the NRO but never exposed its endpoint;
+this candidate therefore uses the foreground initialization path.
 
 Normal subsequent NRO replacement is hbloader's own behavior. There is no
 StopNRO command, forced NRO termination or generic NRO launch bridge here.
-An active unexpected NRO blocks restoration instead of being closed. Background
-launch failure is retried within the deadline; no foreground fallback is added
-to this candidate. A failed automatic return does not imply the game failed.
+An active unexpected NRO blocks restoration instead of being closed. Launch failure is retried within the deadline. A failed automatic return does not imply the game failed.
 
 Explicit HOME/sleep, an unrelated launch, game completion or qlaunch replacement
 cancels pending return. A completed holder is released and its external-content
