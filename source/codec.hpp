@@ -6,9 +6,9 @@
 
 namespace observer {
 constexpr std::uint32_t InMagic = 0x49434653, OutMagic = 0x4f434653;
-enum class Kind : std::uint8_t { Unknown, Root, Proxy, Common, Home, AppCreator, LibCreator, Application, Library, Storage, StorageAccessor };
+enum class Kind : std::uint8_t { Unknown, Root, Proxy, Common, Home, AppCreator, LibCreator, Application, Library, Storage, StorageAccessor, LibraryProxy, LibrarySelf };
 inline const char* name(Kind k) {
-    constexpr const char* names[] = {"unknown", "appletAE", "system-proxy", "common-state", "home-functions", "app-creator", "lib-creator", "application", "library-applet", "general-storage", "storage-accessor"};
+    constexpr const char* names[] = {"unknown", "appletAE", "system-proxy", "common-state", "home-functions", "app-creator", "lib-creator", "application", "library-applet", "general-storage", "storage-accessor", "library-proxy", "library-self"};
     return names[static_cast<unsigned>(k)];
 }
 inline std::uint32_t word(const void* p) { std::uint32_t n; std::memcpy(&n, p, 4); return n; }
@@ -22,7 +22,7 @@ inline ChannelHeader channel_header(const std::uint8_t* p, std::size_t n) {
 }
 struct Request {
     bool valid{}, domain{}, closing{};
-    std::uint32_t object{}, command{}, argument{}, argument_high{};
+    std::uint32_t object{}, command{}, argument{}, argument_high{}, token{};
 };
 // These helpers only read the already-forwarded CMIF bytes. They issue no IPC.
 inline Request request(const std::uint8_t* p, std::size_t n) {
@@ -35,7 +35,7 @@ inline Request request(const std::uint8_t* p, std::size_t n) {
         r.domain = true; r.object = word(p + 4); p += 16; n = payload;
     }
     if (n < 16 || word(p) != InMagic) return {};
-    r.valid = true; r.command = word(p + 8);
+    r.valid = true; r.command = word(p + 8); r.token = word(p + 12);
     if (n >= 20) r.argument = word(p + 16);
     if (n >= 24) r.argument_high = word(p + 20);
     return r;
@@ -44,7 +44,7 @@ struct Reply { bool valid{}; std::uint32_t result{}, count{}, object{}, scalar{}
 // PushInData on a library accessor is also command 100. Only an actual
 // process-tagged Open*Proxy request may identify an unknown object as root.
 inline bool root_open(std::uint32_t cmd, bool sends_pid, std::uint32_t copy_handles) {
-    return (cmd == 100 || cmd == 110) && sends_pid && copy_handles == 1;
+    return (cmd == 100 || cmd == 110 || cmd == 200 || cmd == 201) && sends_pid && copy_handles == 1;
 }
 inline Reply reply(const std::uint8_t* p, std::size_t n, bool domain, bool object_reply) {
     Reply r;
@@ -59,6 +59,10 @@ inline Reply reply(const std::uint8_t* p, std::size_t n, bool domain, bool objec
 }
 inline Kind returned_kind(Kind k, std::uint32_t cmd) {
     if (k == Kind::Root && (cmd == 100 || cmd == 110)) return Kind::Proxy;
+    if (k == Kind::Root && (cmd == 200 || cmd == 201)) return Kind::LibraryProxy;
+    if (k == Kind::LibraryProxy) {
+        switch (cmd) { case 0: return Kind::Common; case 11: return Kind::LibCreator; case 20: return Kind::LibrarySelf; }
+    }
     if (k == Kind::Proxy) {
         switch (cmd) { case 0: return Kind::Common; case 11: return Kind::LibCreator; case 20: return Kind::Home; case 22: return Kind::AppCreator; }
     }

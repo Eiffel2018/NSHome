@@ -10,6 +10,12 @@ int main() {
     std::array<std::uint8_t, 96> bytes{};
     put(bytes.data(), InMagic); put(bytes.data()+8, 100);
     assert(request(bytes.data(), 16).command == 100);
+    assert(root_open(201, true, 1));
+    assert(!root_open(201, false, 1));
+    assert(returned_kind(Kind::Root, 201) == Kind::LibraryProxy);
+    assert(returned_kind(Kind::LibraryProxy, 20) == Kind::LibrarySelf);
+    assert(returned_kind(Kind::LibraryProxy, 0) == Kind::Common);
+    assert(returned_kind(Kind::Proxy, 20) == Kind::Home);
     auto unchanged = bytes;
     for (std::size_t n = 0; n < 16; ++n) assert(!request(bytes.data(), n).valid);
     assert(bytes == unchanged);

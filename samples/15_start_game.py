@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Game launch protocol example; current module returns launch-bridge-unavailable."""
+"""Queue a PC game start; 0.1.8 candidate selects a user and restores Breeze. Check status for outcome."""
 from _common import parser, run, ranged, BUTTONS, STACKS, buttons, nro_path, Path
 
 

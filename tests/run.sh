@@ -12,6 +12,9 @@ g++ "${flags[@]}" -Itests/runtime_stub tests/runtime_test.cpp source/runtime.cpp
 build/tests/runtime
 g++ "${flags[@]}" -DNSH_BRIDGE_HOST_TEST -Isource -Itests/home_bridge_stub tests/home_bridge_test.cpp source/home_bridge.cpp -o build/tests/home_bridge
 build/tests/home_bridge
+
+g++ "${flags[@]}" -Isource tests/launch_policy_test.cpp -o build/tests/launch_policy
+build/tests/launch_policy
 g++ "${flags[@]}" -Isource tests/codec_test.cpp -o build/tests/codec
 build/tests/codec
 for component in protocol input touch capture; do

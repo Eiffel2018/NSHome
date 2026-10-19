@@ -44,7 +44,7 @@ void writer(void*) {
     if (R_FAILED(ams::fs::OpenFile(&file, path, ams::fs::OpenMode_Write | ams::fs::OpenMode_AllowAppend))) return;
     if (R_FAILED(ams::fs::SetFileSize(file, 0))) { ams::fs::CloseFile(file); return; }
     ams::fs::CloseFile(file);
-    const char header[] = "AM Observer 0.1.7; optional armed HOME bridge; separate authenticated 6802 worker\ncoverage=root+domain RPC; child sessions copied out of a domain may bypass tracing\nempty ReceiveMessage omitted; flags 0x40=SAMS,0x80=BZOV,0x200=startup stage,0x400=HOME consumed,0x800=bridge result\nstartup cmd:1=main,2=before MITM,3=MITM result,4=relay,10=remote thread create,11=remote entry,12=FS init,13=SD mount,14=remote start(bool),15=stdio probe errno\nfields: seq tick session interface object cmd arg transport_rc am_rc scalar child flags dropped\n";
+    const char header[] = "AM Observer 0.1.8; experimental stock-qlaunch PC launch and HOME bridge\ncoverage=root+domain RPC; copied child sessions may bypass tracing\nflags:0x40=SAMS,0x80=BZOV,0x200=startup,0x400=HOME consumed,0x800=HOME result,0x1000=scoped launch replacement\nstartup:60=launch worker,61=native launch (arg=port),62=preselected user,63=application Start,64=Breeze start,65=Breeze identified,67=AM launch-request message\nfields:seq tick session interface object cmd arg transport_rc am_rc scalar child flags dropped\n";
     std::size_t offset = sizeof(header) - 1;
     if (!append(path, 0, header, offset)) return;
     for (;;) {

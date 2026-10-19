@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (experimental 0.1.7), not
+This reference describes the current NSHome source (0.1.8 offline candidate), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -59,7 +59,7 @@ authenticated connection for each command.
 | [12_home_arm.py](../samples/12_home_arm.py) | Required `--generation` positive decimal, at most 19 digits | `home arm GENERATION`; experimental, manual identity check required |
 | [13_home_off.py](../samples/13_home_off.py) | None | `home off`; stops HOME interception, module continues running |
 | [14_launch_nro.py](../samples/14_launch_nro.py) | Required `--path` absolute SD .nro path | `launch PATH`; **currently ERR launch-bridge-unavailable** |
-| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID`; **currently ERR launch-bridge-unavailable** |
+| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow in the 0.1.8 candidate, unverified on hardware |
 | [16_home_button.py](../samples/16_home_button.py) | `--ms` 1..1000 default 100 | `press HOME MS`; presses HOME, does not enable HOME switching |
 | [17_capture_button.py](../samples/17_capture_button.py) | `--ms` 1..1000 default 100 | `press CAPTURE MS`; console Album workflow, no JPEG response to PC |
 
@@ -99,8 +99,9 @@ NRO path syntax accepts `/switch/Example/Example.nro` or the same path prefixed
 with `sdmc:`. Spaces are preserved; quote the entire path in a shell. Canonical
 UTF-8 path length must be less than 512 bytes. Traversal components, duplicate
 slashes, backslashes, quotes, colons inside the path and control bytes are rejected.
-The launch examples intentionally expose the current unsupported response rather
-than simulating success or falling back to another port:
+Generic NRO launch remains unsupported. Game launch is queued by the 0.1.8
+candidate; the installed 0.1.7 build still rejects it. Neither example falls
+back to another port:
 
 ```sh
 python samples/14_launch_nro.py --host SWITCH_IP --path "/switch/Example/Example.nro"
@@ -109,6 +110,19 @@ python samples/15_start_game.py --host SWITCH_IP --title-id 0100000000000001
 
 The title ID above is a syntax placeholder, not an installed-title recommendation.
 
+For `gamestart`, the explicit authenticated 6802 request is the PC-origin marker.
+Only that transaction selects the first system-listed user and schedules Breeze
+return after the matching application's Start succeeds. Check `status` for the
+same request ID: `queued`/`launching` is pending, `started` means the automatic
+return reached its loader/session milestone, and `failed` includes a nonzero
+result. A failed return can leave the game running; never resend a start merely
+because return timed out. `started` is not proof of a game's menu being ready.
+No capture/click loop or PC command to reopen Breeze is required by the candidate.
+
+Manual console launches and unmarked 6801 launches retain stock behavior.
+The 6801 AM request does not prove PC origin, so NSHome does not guess from
+Breeze being present. See [the candidate launch implementation](LAUNCH.md).
+
 ## Experimental HOME controls
 
 `home status` reports `armed` (armed generation or 0), `album` (latest live Album
@@ -116,10 +130,12 @@ AM root generation or 0), `pid` (that process), `library`, `game`, `functions`
 (tracked AM object IDs), and `game_front` (the bridge's internal toggle state,
 not an independent foreground query).
 
-**Album presence does not identify Breeze.** Only manually arm while you have
+**Album presence does not identify Breeze.** The candidate arms automatically
+after the scoped PC launch verifies its Breeze loader/session (or an already
+identified resident Breeze). For the separate manual diagnostic command, arm only while you have
 verified Breeze is the foreground Album NRO, a game is running, and the displayed
-generation is fresh. There is no automatic identity check in this sample or the
-current module. Do not use a saved generation, and disarm before another NRO runs.
+generation is fresh. The manual sample itself does not identify Breeze.
+Do not use a saved generation, and disarm before another NRO runs.
 
 ```sh
 python samples/11_home_status.py --host SWITCH_IP
@@ -168,7 +184,7 @@ is left to the consumer. Existing output files are refused.
 | `ERR controller-cleanup rc=0x...` | Cleanup not confirmed; inspect state before more input |
 | `ERR capture rc=0x...` | Capture unavailable/failed in this state |
 | `ERR home-generation` / `ERR home-not-ready` / `ERR home-command` | Invalid generation, unavailable tracked objects or unknown HOME command |
-| `ERR launch-bridge-unavailable` | Current module has no launch consumer; no launch queued |
+| `ERR launch-bridge-unavailable` | Generic NRO launch, an older build or failed launch-worker startup; nothing queued |
 | `ERR busy` | Queue occupied if a launch consumer is added; not evidence of launch |
 | Timeout / EOF / malformed reply | Outcome may be unknown; never automatically repeat input/launch |
 

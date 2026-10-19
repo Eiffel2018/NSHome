@@ -185,7 +185,10 @@ class Client:
         return self._exchange('launch ' + nro_path(path))
 
     def game_start(self, title_id):
-        """Currently raises RemoteError: ERR launch-bridge-unavailable."""
+        """Queue a PC launch. 0.1.8 candidate restores Breeze; status tracks outcome.
+
+        An OK queued reply does not prove game readiness. 0.1.7 rejects this call.
+        """
         if not isinstance(title_id, str) or not re.fullmatch(r'[0-9a-fA-F]{16}', title_id) or int(title_id, 16) == 0:
             raise ValueError('Title ID must be exactly 16 hexadecimal digits with a nonzero value (no 0x prefix)')
         return self._exchange('gamestart ' + title_id)

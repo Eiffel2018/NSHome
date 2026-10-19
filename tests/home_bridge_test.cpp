@@ -11,6 +11,9 @@ int main() {
     q->object_id = 1;
     home::register_root(q, 100, true);
     home::bind_root(&session, 100);
+    assert(home::is_qlaunch(&session));
+    assert(!home::is_qlaunch(&unrelated));
+    assert(!home::is_qlaunch(nullptr));
     auto seen = [&](Kind kind, unsigned cmd, unsigned object, unsigned child = 0, bool closing = false) {
         Request request; request.valid = request.domain = true;
         request.command = cmd; request.object = object; request.closing = closing;
@@ -56,4 +59,16 @@ int main() {
     assert(home::command("home arm -1") == "ERR home-generation\n");
     assert(home::command("home arm 99999999999999999999") == "ERR home-generation\n");
     assert(home::command("home off") == "OK home disabled\n");
+    // Only a proved, newly initialized NRO can arm the owned background accessor.
+    home::adopt_library(80, armGetSystemTick());
+    assert(!home::identify_breeze(3, true)); // old Album predates the owned library
+    auto restored = std::make_shared<Service>();
+    home::register_root(restored, 150, false);
+    assert(!home::identify_breeze(3, true));
+    assert(home::identify_breeze(4, true));
+    calls.clear();
+    assert(home::consume_home(&session));
+    assert((calls == std::vector<std::pair<unsigned,unsigned>>{{80,1},{40,1},{10,10}}));
+    restored.reset();
+    assert(!home::consume_home(&session));
 }

@@ -75,6 +75,11 @@ void bind_root(const void* session, std::uint64_t pid) {
     auto* q = find(qgeneration);
     if (q && q->pid == pid && !q->forward.expired()) qsession = session;
 }
+bool is_qlaunch(const void* session) {
+    std::scoped_lock lock(mutex);
+    const auto* q = find(qgeneration);
+    return session && session == qsession && q && !q->forward.expired();
+}
 void observe(const void* session, Kind kind, const Request& request, const Reply& reply) {
     std::scoped_lock lock(mutex);
     if (session != qsession) return;
@@ -149,5 +154,18 @@ std::string command(std::string_view line) {
         (unsigned long long)armed_generation, (unsigned long long)(b ? b->generation : 0),
         (unsigned long long)(b ? b->pid : 0), library, application, functions, game_front);
     return out;
+}
+void adopt_library(std::uint32_t object, std::uint64_t tick) {
+    std::scoped_lock lock(mutex);
+    library = object; library_created = library_start = tick; armed_generation = 0;
+}
+bool identify_breeze(std::uint64_t generation, bool game_in_front) {
+    std::scoped_lock lock(mutex);
+    const auto* b = album();
+    if (!b || b->generation != generation) return false;
+    armed_generation = generation;
+    if (!valid()) { armed_generation = 0; return false; }
+    game_front = game_in_front;
+    return true;
 }
 }

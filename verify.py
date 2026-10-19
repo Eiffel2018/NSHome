@@ -103,7 +103,9 @@ def verify(elf_path, nsp_path, disassembly_path):
         'wrapped_calls': wrapped,
         'sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (elf_path, nsp_path)},
         'hardware_tested': False,
-        'launch_bridge_connected': False,
+        'launch_bridge_connected': '_ZN8observer6launch5startEv' in functions,
+        'launch_flow_hardware_tested': False,
+        'launch_commands': ['gamestart'] if '_ZN8observer6launch5startEv' in functions else [],
     }
     (nsp_path.parent / 'verification.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(json.dumps(receipt, indent=2))

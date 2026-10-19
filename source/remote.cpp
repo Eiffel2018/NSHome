@@ -2,6 +2,7 @@
 #include "trace.hpp"
 #include "remote_nro_server.hpp"
 #include "boot.hpp"
+#include "launch_bridge.hpp"
 #include <cstdio>
 #include <cerrno>
 
@@ -30,7 +31,8 @@ void initialize_remote(void*) {
     if (probe) std::fclose(probe);
     // Missing/disabled Breeze PC-connect settings mean no listener. The wire
     // greeting stays SWITCHU 1 for compatibility with the existing PC client.
-    startup(14, nshome::remote::start(nullptr) ? 0 : 1);
+    const bool launch_ready = launch::start();
+    startup(14, nshome::remote::start(launch_ready ? launch::wake : nullptr) ? 0 : 1);
     configure_boot(); // Does not block the separate 6802 worker or AM loop.
     startup_input_once();
 }

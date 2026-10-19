@@ -15,6 +15,8 @@ Disable any SwitchU qlaunch override first. Extract to SD, then reboot:
 atmosphere/contents/00FF4E5348414D01/exefs.nsp
 atmosphere/contents/00FF4E5348414D01/mitm.lst
 atmosphere/contents/00FF4E5348414D01/flags/boot2.flag
+atmosphere/contents/00FF4E5348414D01/breeze_loader/main
+atmosphere/contents/00FF4E5348414D01/breeze_loader/main.npdm
 ```
 
 `mitm.lst` contains exactly `appletAE`, beside `exefs.nsp`.
@@ -24,19 +26,23 @@ Original Nintendo qlaunch remains in use.
 
 TCP6802 uses `switch/Breeze/config.ini`, section `[PC connect]`.
 Controls, touch, capture and diagnostics work independently of Breeze6801.
-NRO/game launch currently returns `launch-bridge-unavailable`.
+The 0.1.8 offline candidate adds PC6802 game launch; generic NRO launch still
+returns `launch-bridge-unavailable`. The installed 0.1.7 build rejects both.
+The matched Breeze loader pair above is required for automatic return.
+See [launch behavior, origin rules and pending checks](LAUNCH.md).
 Use bounded input pulses, disable the input gate afterwards, and never replay
 an input whose result is unknown.
 
-The experimental HOME bridge requires explicit arming. With Breeze in front,
+The candidate automatically arms after its scoped PC6802 launch verifies Breeze.
+For the separate manual diagnostic control, with Breeze in front,
 verify its6801 service, then send authenticated6802 `home status` followed by
 `home arm GENERATION`, using the current `album` generation. A live game is
 required. `home off` restores ordinary HOME handling. Session closure or observed
 completion disarms switching; other NROs are not automatically armed.
 
 Hidden Breeze UI/debug RPC may return busy. Stock qlaunch suspends the game
-behind Breeze; pending Step may require game foreground. Automatic identification,
-continuous trace and general exit/chainload behavior remain unfinished.
+behind Breeze; pending Step may require game foreground. The new automatic flow,
+continuous trace and general exit/chainload behavior still need hardware checks.
 
 ## Boot unlock and recovery
 

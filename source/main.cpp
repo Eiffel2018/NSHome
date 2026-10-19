@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "trace.hpp"
 #include "home_bridge.hpp"
+#include "launch_bridge.hpp"
 #include <cstdlib>
 
-// No implemented commands: all AM requests go through the original relay.
+// Commands normally relay unchanged. The launch wrapper scopes PC launch handling.
 #define OBSERVER_COMMANDS(C,H)
 AMS_SF_DEFINE_MITM_INTERFACE(observer_sf, IAmObserver, OBSERVER_COMMANDS, 0x4e53414d);
 namespace observer {
@@ -28,6 +29,7 @@ class Manager final : public ams::sf::hipc::ServerManager<1, Options, 32> {
         ams::sm::MitmProcessInfo client{};
         server->AcknowledgeMitmSession(&forward, &client);
         home::register_root(forward, client.process_id.value, client.program_id == ams::ncm::SystemAppletId::Qlaunch);
+        launch::register_root(forward, client.process_id.value, client.program_id == ams::ncm::SystemAppletId::Qlaunch);
         accepted(client.process_id.value);
         return AcceptMitmImpl(server, ams::sf::CreateSharedObjectEmplaced<observer_sf::IAmObserver, Service>(decltype(forward)(forward), client), forward);
     }

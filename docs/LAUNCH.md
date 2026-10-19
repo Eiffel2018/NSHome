@@ -1,0 +1,72 @@
+# PC game launch candidate (0.1.8)
+
+This is an offline-built implementation, not a hardware acceptance claim or a
+published release. Stock qlaunch remains installed and owns applications.
+
+## Origin and behavior
+
+Only an authenticated TCP6802 `gamestart TITLE_ID` creates an automatic-launch
+transaction. It is bound to the request ID, qlaunch session, title and observed
+application accessor. Native Start must succeed before the return timer begins.
+Manual console starts never create this transaction. 6801 requests are forwarded
+with their original behavior: current AM messages do not identify whether the
+Breeze user clicked a menu or a PC sent `gamestart`. Breeze source is not changed.
+
+The worker selects the first account returned by `accountListAllUsers`, matching
+SwitchU's PC launch policy. An empty account list or running game is rejected
+(including a read-only process query for accessors outside tracing coverage);
+the module does not terminate a game to replace it. It sends the native
+`IDebugFunctions::RequestLaunchApplicationWithUserAndArgumentForDebug` request
+through a cloned qlaunch session, with that UID and no user launch payload.
+Stock qlaunch receives its normal messages (message 50 is never swallowed), and creates
+the application. Immediately before that transaction's Start, NSHome supplies
+the same 0x88-byte `PreselectedUser` ABI used by the old launcher. Preselection
+failure rejects this Start rather than silently claiming automatic selection.
+
+This adapts the old first-account and delayed-return mechanisms, rather than
+copying its whole qlaunch replacement. Native qlaunch honoring the user-aware
+request without showing a selector is a required device check.
+
+## Breeze return
+
+After the matching Start succeeds, wait two seconds. Reuse an identified live
+Breeze if available. Otherwise wait for game startup applets and other library
+applets/NROs to finish; do not forcibly close another NRO. Retry availability
+every two seconds, within a 30-second transaction deadline.
+
+A dedicated nx-hbloader build loads `sdmc:/switch/Breeze/Breeze.nro` as a
+background Album applet. Its external-content registration is scoped to this
+owned holder; the original qlaunch executable and persistent Album override are
+unchanged. A consumed one-shot ticket plus the mapped-path/PID receipt and a
+live AM root identify the new Breeze session before HOME switching is armed.
+An existing Breeze can be identified once through its authenticated local6801
+state response; that proof belongs to one AM generation, not all Album applets.
+
+Normal subsequent NRO replacement is hbloader's own behavior. There is no
+StopNRO command, forced NRO termination or generic NRO launch bridge here.
+An active unexpected NRO blocks restoration instead of being closed. Background
+launch failure is retried within the deadline; no foreground fallback is added
+to this candidate. A failed automatic return does not imply the game failed.
+
+Explicit HOME/sleep, an unrelated launch, game completion or qlaunch replacement
+cancels pending return. A completed holder is released and its external-content
+registration removed. Once verified, the existing HOME bridge switches between
+the game and that exact resident Breeze generation without a PC `home arm` call.
+
+## Build, artifacts and checks
+
+`build.sh` builds both the module and `loader/`, then extracts a matched loader
+`main` and `main.npdm` pair to `build/breeze_loader`. Packaging must include both.
+The native request APIs require modern firmware (the candidate targets the
+existing test environment); general firmware compatibility is not established.
+
+Host tests cover PC intent versus manual starts, exact user argument bytes,
+request/session/accessor fencing, timing, cancellation, bounded retries, reply
+framing and adopted HOME sessions. Compilation verifies AArch64 module/loader
+containers and program IDs. These tests do not emulate proprietary qlaunch.
+
+Required device checks include first-user selection with multiple accounts,
+game startup without a selector, Breeze background launch and automatic HOME
+arming, unchanged manual/6801 starts, cancellation and normal exit. General
+background tracing and controller behavior across process boundaries remain
+separate runtime acceptance items.

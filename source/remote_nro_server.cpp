@@ -7,6 +7,7 @@
 #include "remote_nro_capture.hpp"
 #include "remote_nro_touch.hpp"
 #include "home_bridge.hpp"
+#include "launch_bridge.hpp"
 #include <switch.h>
 #include <stratosphere.hpp>
 
@@ -273,9 +274,9 @@ void answerError(int fd, const char* reason) {
 }
 
 bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0) {
-    // The qlaunch launch bridge is not connected yet. Never queue work which
-    // has no consumer or report an apparent successful loader handoff.
-    if (!g_wake)
+    // Only game start has a consumer. Generic NRO launch is deliberately
+    // unavailable; neither enqueue orphan work nor claim a loader handoff.
+    if (!g_wake || titleId == 0)
         return sendAll(fd, "ERR launch-bridge-unavailable\n", "launch-unavailable");
     std::uint64_t id = 0;
     void (*wake)() = nullptr;
@@ -571,6 +572,7 @@ void serverThread(void*) {
         bool loggedPoll = false;
 
         while (g_running.load() && g_wakeEpoch.load() == listenerEpoch) {
+            observer::launch::network_tick(g_code.c_str());
             sockaddr_in clientAddress{};
             socklen_t addressLength = sizeof(clientAddress);
             const int client = ::accept(listener,

@@ -2,6 +2,8 @@
 #include "trace.hpp"
 #include "home_bridge.hpp"
 #include "boot.hpp"
+#include "launch_bridge.hpp"
+#include "launch_reply.hpp"
 #include <algorithm>
 
 using Session = ams::sf::hipc::ServerSession;
@@ -39,8 +41,10 @@ Bytes raw(const void* buffer, std::size_t size, const std::uint32_t* words, std:
 extern "C" ams::Result observe_forward(const Session* session, const Context& ctx) {
     const auto in = raw(ctx.in_message_buffer.GetPointer(), ctx.in_message_buffer.GetSize(), ctx.request.data.data_words, ctx.request.meta.num_data_words);
     const auto request = observer::request(in.p, in.size);
-    if (request.valid && ctx.request.meta.send_pid && ctx.request.meta.num_copy_handles == 1 &&
-        (request.command == 100 || request.command == 110)) observer::home::bind_root(session, ctx.request.pid);
+    if (request.valid && observer::root_open(request.command, ctx.request.meta.send_pid, ctx.request.meta.num_copy_handles)) {
+        observer::home::bind_root(session, ctx.request.pid);
+        observer::launch::bind_root(session, ctx.request.pid);
+    }
     const auto interface = request.valid ? kind(session, request,
         observer::root_open(request.command, ctx.request.meta.send_pid, ctx.request.meta.num_copy_handles)) : observer::Kind::Unknown;
     const auto child_kind = observer::returned_kind(interface, request.command);
@@ -59,20 +63,28 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
         if (hipcGetBufferSize(&descriptor) >= 16) storage_output = static_cast<const std::uint8_t*>(hipcGetBufferAddress(&descriptor));
     }
 
-    // Forward the original request exactly once. The optional bridge below
-    // can act only on short HOME for an explicitly armed live session pair.
+    std::uint32_t replaced_result = 0;
+    if (observer::launch::intercept(session, interface, request, replaced_result)) {
+        observer::launch::make_reply(ams::sf::hipc::GetMessageBufferOnTls(), request.domain, replaced_result, request.token);
+        record.result = replaced_result; record.flags |= 0x1000;
+        observer::push(record);
+        return ams::ResultSuccess();
+    }
+    // All other requests are forwarded exactly once. Message 50 remains stock.
     const auto transport = real_forward(session, ctx);
     record.transport = transport.GetValue();
     if (R_SUCCEEDED(transport) && request.closing) {
         observer::home::observe(session, interface, request, {});
+        observer::launch::observe(session, interface, request, {});
         forget(session, request.object);
     }
     if (R_SUCCEEDED(transport) && request.valid && !request.closing) {
         const auto response = hipcParseResponse(ams::sf::hipc::GetMessageBufferOnTls());
         const auto bytes = raw(ams::sf::hipc::GetMessageBufferOnTls(), 0x100, response.data_words, response.num_data_words);
         const auto reply = observer::reply(bytes.p, bytes.size, request.domain, child_kind != observer::Kind::Unknown);
-        observer::observe_boot(interface, request, reply);
+        if (observer::home::is_qlaunch(session)) observer::observe_boot(interface, request, reply);
         observer::home::observe(session, interface, request, reply);
+        observer::launch::observe(session, interface, request, reply);
         if (reply.valid) {
             record.flags |= 8; record.result = reply.result;
             if (interface == observer::Kind::Common && request.command == 1 && reply.result == 0) record.scalar = reply.scalar;
