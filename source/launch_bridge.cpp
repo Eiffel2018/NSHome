@@ -192,18 +192,22 @@ Result no_running_game() {
     if (R_FAILED(rc)) return rc;
     return pid ? Busy : 0;
 }
-bool valid_nro() {
+bool valid_nro(const char* path = NSH_BREEZE_PATH) {
     std::uint8_t header[0x80]{};
-    FILE* file = std::fopen(NSH_BREEZE_PATH, "rb");
+    FILE* file = std::fopen(path, "rb");
     if (!file) return false;
     const auto count = std::fread(header, 1, sizeof(header), file);
     const bool ok = count == sizeof(header) && std::memcmp(header + 0x10, "NRO0", 4) == 0;
     std::fclose(file); return ok;
 }
-bool ticket_file(std::uint64_t ticket) {
+bool ticket_file(std::uint64_t ticket, const char* path = NSH_BREEZE_PATH) {
+    NshLoaderTicket value{};
+    value.magic = 0x5448534e; value.version = 2; value.ticket = ticket;
+    std::snprintf(value.path, sizeof(value.path), "%s", path);
+    if (!nshLoaderTicketValid(&value)) return false;
     FILE* file = std::fopen(NSH_LOADER_TICKET, "wb");
     if (!file) return false;
-    const bool wrote = std::fwrite(&ticket, sizeof(ticket), 1, file) == 1;
+    const bool wrote = std::fwrite(&value, sizeof(value), 1, file) == 1;
     const bool closed = std::fclose(file) == 0;
     return wrote && closed && R_SUCCEEDED(fsdevCommitDevice("sdmc"));
 }
@@ -264,8 +268,9 @@ Result launch_handoff(Connection& c, Service& owned_holder, std::uint64_t owned_
         if (R_FAILED(rc)) return rc;
     }
 }
-Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
-    if (!valid_nro()) return NotReady;
+Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket,
+                   const char* path = NSH_BREEZE_PATH, bool restoring = true) {
+    if (!valid_nro(path)) return NotReady;
     // Match the upstream foreground applet runner. An AllForeground child
     // must not be started while its qlaunch parent is still behind the game.
     auto rc = serviceDispatch(&c.functions, 10);
@@ -278,7 +283,7 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     }
     if (R_SUCCEEDED(rc) && focus != AppletFocusState_InFocus) rc = KERNELRESULT(TimedOut);
     startup(69, rc, focus);
-    if (R_FAILED(rc) || !ticket_file(ticket)) return R_FAILED(rc) ? rc : NotReady;
+    if (R_FAILED(rc) || !ticket_file(ticket, path)) return R_FAILED(rc) ? rc : NotReady;
     rc = register_loader();
     if (R_FAILED(rc)) return rc;
     // Breeze needs a normal foreground initialization on the tested firmware.
@@ -296,7 +301,7 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     startup(72, rc);
     if (R_SUCCEEDED(rc)) {
         std::scoped_lock lock(mutex);
-        if (policy.phase != Phase::Restoring || policy.epoch != c.epoch || qepoch != c.epoch) rc = Cancelled;
+        if (qepoch != c.epoch || (restoring && (policy.phase != Phase::Restoring || policy.epoch != c.epoch))) rc = Cancelled;
     }
     if (R_SUCCEEDED(rc)) {
         // Publish before Start: the NRO may initialize AM before it returns.
@@ -310,6 +315,130 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     }
     return rc;
 }
+bool connection_current(const Connection& c) {
+    std::scoped_lock lock(mutex);
+    return qepoch == c.epoch;
+}
+// An explicit PC NRO launch replaces the Album slot internally. No separate
+// client Stop-NRO call is required. Other library applets are never terminated.
+Result replace_album(Connection& c, Service& holder, std::uint64_t& holder_generation) {
+    if (serviceIsActive(&holder)) {
+        bool done = false;
+        auto rc = complete(&holder, done);
+        if (R_FAILED(rc)) return rc;
+        if (done) { serviceClose(&holder); holder_generation = 0; rc = unregister_loader(); }
+        if (R_FAILED(rc)) return rc;
+    }
+    u8 occupied = 0;
+    auto rc = serviceDispatchOut(&c.creator, 2, occupied);
+    startup(92, rc, occupied);
+    if (R_FAILED(rc)) return rc;
+    // AreAnyLibraryAppletsLeft may exclude the holder created through our
+    // cloned session. Its live accessor is still the owned Album slot.
+    if (!occupied && !serviceIsActive(&holder)) return 0;
+    home::LibrarySnapshot snapshot;
+    if (!home::library_snapshot(snapshot)) { startup(93, Busy); return Busy; }
+    if (serviceIsActive(&holder) && holder.object_id != snapshot.object) { startup(94, Busy, snapshot.object); return Busy; }
+    auto previous = borrowed(c.connection, snapshot.object);
+    LibAppletInfo info{};
+    rc = serviceDispatchOut(&previous, 120, info);
+    startup(95, rc, static_cast<std::uint32_t>(info.appletId));
+    if (R_FAILED(rc)) return rc;
+    if (info.appletId != AppletId_LibraryAppletPhotoViewer) return Busy;
+    (void)home::command("home off");
+    if (holder_generation && serviceIsActive(&holder) && background_current(c, holder_generation)) {
+        rc = send_background(c, holder, holder_generation, background::Release);
+        if (R_FAILED(rc)) return rc;
+    }
+    if (!connection_current(c) || !home::matches_library(snapshot)) return Cancelled;
+    rc = serviceDispatch(&c.functions, 10);
+    if (R_SUCCEEDED(rc)) rc = serviceDispatch(&previous, 20); // RequestExit once.
+    if (R_FAILED(rc)) return rc;
+    bool done = false;
+    const auto wait_complete = [&](std::uint64_t timeout) -> Result {
+        const auto until = now() + timeout;
+        do {
+            if (!connection_current(c)) return Cancelled;
+            if (!home::matches_library(snapshot)) {
+                u8 left = 1;
+                const auto checked = serviceDispatchOut(&c.creator, 2, left);
+                if (R_SUCCEEDED(checked) && !left) { done = true; return 0; }
+                return Cancelled;
+            }
+            auto result = complete(&previous, done);
+            if (R_FAILED(result)) {
+                u8 left = 1;
+                const auto checked = serviceDispatchOut(&c.creator, 2, left);
+                if (R_SUCCEEDED(checked) && !left) { done = true; return 0; }
+                return result;
+            }
+            if (done) return 0;
+            ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+        } while (now() < until);
+        return KERNELRESULT(TimedOut);
+    };
+    rc = wait_complete(1500);
+    if (rc == KERNELRESULT(TimedOut)) {
+        // Match libnx RequestExitOrTerminate, but only for the same verified
+        // PhotoViewer process/accessor. hbloader may have returned to hbmenu.
+        if (!connection_current(c) || !home::matches_library(snapshot)) return Cancelled;
+        rc = serviceDispatch(&previous, 25);
+        if (R_SUCCEEDED(rc)) rc = wait_complete(2000);
+    }
+    if (R_FAILED(rc) || !done) return R_FAILED(rc) ? rc : NotReady;
+    if (serviceIsActive(&holder)) serviceClose(&holder);
+    holder_generation = 0;
+    rc = unregister_loader();
+    if (R_FAILED(rc)) return rc;
+    // Native completion may precede the relay observing the closed Album
+    // sessions. Do not mistake that short gap for a foreign active NRO.
+    const auto closed = now() + 2000;
+    while (now() < closed) {
+        if (!connection_current(c)) return Cancelled;
+        { std::scoped_lock lock(mutex); const auto* a = latest_album();
+          if (!a) return 0;
+          if (a->pid != snapshot.pid) return Cancelled; }
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+    }
+    return KERNELRESULT(TimedOut);
+}
+__attribute__((noinline)) Result launch_nro(Connection& c, Service& holder, std::uint64_t& holder_generation,
+                  const nshome::remote::Request& request) {
+    if (!valid_nro(request.path.c_str())) return NotReady;
+    auto rc = replace_album(c, holder, holder_generation);
+    if (R_FAILED(rc)) return rc;
+    { std::scoped_lock lock(mutex); policy = {}; }
+    (void)home::command("home off");
+    const auto ticket = armGetSystemTick();
+    rc = open_breeze(c, holder, ticket, request.path.c_str(), false);
+    startup(90, rc, static_cast<std::uint32_t>(request.id));
+    if (R_FAILED(rc)) return rc;
+    const auto deadline = now() + 15000;
+    while (now() < deadline) {
+        if (!connection_current(c)) return Cancelled;
+        NshLoaderReceipt value{};
+        if (receipt(value) && value.ticket == ticket && value.sequence == 1) {
+            if (value.result) return value.result;
+            if (value.ready && std::strcmp(value.path, request.path.c_str()) == 0) {
+                // Other NROs need no Breeze server. A short-lived NRO may
+                // already have returned; the receipt still proves its mapping.
+                if (request.path != NSH_BREEZE_PATH) return 0;
+                std::uint64_t generation = 0;
+                { std::scoped_lock lock(mutex); const auto* a = latest_album();
+                  if (a && a->pid == value.pid && a->generation == proven) generation = a->generation; }
+                if (generation) {
+                    // Explicitly opening Breeze leaves it foreground. Arm the
+                    // optional game toggle only when a live game pair exists.
+                    holder_generation = generation;
+                    (void)home::identify_breeze(generation, false, background_capable());
+                    return 0;
+                }
+            }
+        }
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+    }
+    return KERNELRESULT(TimedOut);
+}
 void worker(void*) {
     Connection connection;
     Service holder{};
@@ -320,10 +449,19 @@ void worker(void*) {
         if (R_SUCCEEDED(connected)) background_tick(connection, holder, holder_generation);
         nshome::remote::Request request;
         if (nshome::remote::take(request)) {
+            if (request.kind == nshome::remote::RequestKind::Nro) {
+                const auto rc = R_SUCCEEDED(connected) ? launch_nro(connection, holder, holder_generation, request) : connected;
+                startup(91, rc, static_cast<std::uint32_t>(request.id));
+                nshome::remote::finish(request.id, R_SUCCEEDED(rc) ? "started" : "failed", rc);
+                continue;
+            }
             Result rc = request.kind == nshome::remote::RequestKind::StartGame ? connected : NotReady;
             User selected{};
             if (R_SUCCEEDED(rc)) rc = no_running_game();
             if (R_SUCCEEDED(rc)) rc = first_account(selected);
+            if (R_SUCCEEDED(rc)) {
+                rc = replace_album(connection, holder, holder_generation);
+            }
             if (R_SUCCEEDED(rc)) {
                 rc = launch_handoff(connection, holder, holder_generation);
                 if (R_FAILED(rc)) startup(78, rc);
@@ -432,7 +570,17 @@ void worker(void*) {
         // Finished holders are released without terminating an active replacement NRO.
         if (serviceIsActive(&holder) && !state.pending()) {
             bool done = false;
-            if (R_SUCCEEDED(complete(&holder, done)) && done) { serviceClose(&holder); holder_generation = 0; (void)unregister_loader(); }
+            if (R_SUCCEEDED(complete(&holder, done)) && done) {
+                serviceClose(&holder); holder_generation = 0; (void)unregister_loader();
+                // qlaunch does not own the cloned creator's UI bookkeeping.
+                // A generic tool's ExitProcessAndReturn therefore also needs
+                // its real parent brought forward after completion.
+                if (state.phase == Phase::Idle && R_SUCCEEDED(connected) && connection_current(connection)) {
+                    const u32 button = AppletSystemButtonType_HomeButtonShortPressing;
+                    const auto rc = serviceDispatchIn(&connection.debug, 10, button);
+                    startup(96, rc);
+                }
+            }
         }
         if (!signalled.exchange(false)) ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(100));
     }

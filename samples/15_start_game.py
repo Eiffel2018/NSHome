@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Queue a PC game start; 0.1.8 candidate selects a user and restores Breeze. Check status for outcome."""
+"""Queue a PC game start, select the first user and restore Breeze. Check status for outcome."""
 from _common import parser, run, ranged, BUTTONS, STACKS, buttons, nro_path, Path
 
 

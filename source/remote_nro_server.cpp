@@ -274,9 +274,7 @@ void answerError(int fd, const char* reason) {
 }
 
 bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0) {
-    // Only game start has a consumer. Generic NRO launch is deliberately
-    // unavailable; neither enqueue orphan work nor claim a loader handoff.
-    if (!g_wake || titleId == 0)
+    if (!g_wake)
         return sendAll(fd, "ERR launch-bridge-unavailable\n", "launch-unavailable");
     std::uint64_t id = 0;
     void (*wake)() = nullptr;

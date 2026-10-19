@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (0.1.8 experimental release), not
+This reference describes the current NSHome source (0.1.9), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -58,7 +58,7 @@ authenticated connection for each command.
 | [11_home_status.py](../samples/11_home_status.py) | None | `home status`; see fields below |
 | [12_home_arm.py](../samples/12_home_arm.py) | Required `--generation` positive decimal, at most 19 digits | `home arm GENERATION`; experimental, manual identity check required |
 | [13_home_off.py](../samples/13_home_off.py) | None | `home off`; stops HOME interception, module continues running |
-| [14_launch_nro.py](../samples/14_launch_nro.py) | Required `--path` absolute SD .nro path | `launch PATH`; **currently ERR launch-bridge-unavailable** |
+| [14_launch_nro.py](../samples/14_launch_nro.py) | Required `--path` absolute SD .nro path | `launch PATH` -> `OK queued ID` on 0.1.9+; follow with `status` |
 | [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow; bounded launch, background BP/stepping and HOME checks passed |
 | [16_home_button.py](../samples/16_home_button.py) | `--ms` 1..1000 default 100 | `press HOME MS`; presses HOME, does not enable HOME switching |
 | [17_capture_button.py](../samples/17_capture_button.py) | `--ms` 1..1000 default 100 | `press CAPTURE MS`; console Album workflow, no JPEG response to PC |
@@ -99,9 +99,8 @@ NRO path syntax accepts `/switch/Example/Example.nro` or the same path prefixed
 with `sdmc:`. Spaces are preserved; quote the entire path in a shell. Canonical
 UTF-8 path length must be less than 512 bytes. Traversal components, duplicate
 slashes, backslashes, quotes, colons inside the path and control bytes are rejected.
-Generic NRO launch remains unsupported. Game launch is queued by the 0.1.8
-release; version 0.1.7 rejects it. Neither example falls
-back to another port:
+NRO launch requires 0.1.9 and its matched loader; 0.1.8 rejects it. Game launch
+requires 0.1.8+. Neither example falls back to another port:
 
 ```sh
 python samples/14_launch_nro.py --host SWITCH_IP --path "/switch/Example/Example.nro"
@@ -109,6 +108,15 @@ python samples/15_start_game.py --host SWITCH_IP --title-id 0100000000000001
 ```
 
 The title ID above is a syntax placeholder, not an installed-title recommendation.
+
+For `launch`, the file must exist on SD. NSHome replaces the current Album NRO
+internally; clients do not send Stop NRO first. Other library applets are rejected
+as busy. `started` confirms the owned loader mapped the requested path, not that
+its UI or network server is ready. The canonical Breeze path additionally waits
+for authenticated Breeze identity. Explicit NRO launch leaves that NRO foreground
+and cancels the previous automatic Breeze-return transaction. It does not close
+the running game. Use `/switch/ReturnToHOME.nro` to leave the retained applet and
+return to stock qlaunch.
 
 For `gamestart`, the explicit authenticated 6802 request is the PC-origin marker.
 Only that transaction selects the first system-listed user and schedules Breeze
@@ -184,8 +192,8 @@ is left to the consumer. Existing output files are refused.
 | `ERR controller-cleanup rc=0x...` | Cleanup not confirmed; inspect state before more input |
 | `ERR capture rc=0x...` | Capture unavailable/failed in this state |
 | `ERR home-generation` / `ERR home-not-ready` / `ERR home-command` | Invalid generation, unavailable tracked objects or unknown HOME command |
-| `ERR launch-bridge-unavailable` | Generic NRO launch, an older build or failed launch-worker startup; nothing queued |
-| `ERR busy` | Queue occupied if a launch consumer is added; not evidence of launch |
+| `ERR launch-bridge-unavailable` | An older build or failed launch-worker startup; nothing queued |
+| `ERR busy` | Launch queue occupied; not evidence of launch |
 | Timeout / EOF / malformed reply | Outcome may be unknown; never automatically repeat input/launch |
 
 Queue `status` is not a health check for Breeze or proof that a game/NRO appeared.

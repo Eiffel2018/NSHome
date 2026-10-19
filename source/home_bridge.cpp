@@ -173,6 +173,23 @@ void adopt_library(std::uint32_t object, std::uint64_t tick) {
     std::scoped_lock lock(mutex);
     library = object; library_created = library_start = tick; armed_generation = 0;
 }
+bool library_snapshot(LibrarySnapshot& out) {
+    std::scoped_lock lock(mutex);
+    const auto* b = album();
+    const auto* q = find(qgeneration);
+    if (!q || q->forward.expired() || !b || !library) return false;
+    out = {qgeneration, b->pid, library_created, library};
+    return true;
+}
+bool matches_library(const LibrarySnapshot& value) {
+    std::scoped_lock lock(mutex);
+    const auto* q = find(qgeneration);
+    const auto* b = album();
+    // A normal NRO exit may chain into hbmenu in the same Album process.
+    return q && !q->forward.expired() && value.qlaunch == qgeneration &&
+        value.object == library && value.created == library_created &&
+        (!b || b->pid == value.pid);
+}
 bool identify_breeze(std::uint64_t generation, bool game_in_front, bool background) {
     std::scoped_lock lock(mutex);
     const auto* b = album();

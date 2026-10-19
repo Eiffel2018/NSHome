@@ -105,4 +105,22 @@ int main() {
     restored.reset();
     assert(!home::matches(toggle)); // Holder exit invalidates an in-flight Ack.
     assert(!home::consume_home(&session));
+    // A replacement request follows the Album process through NRO->hbmenu,
+    // but must not terminate a new process or a reused native accessor.
+    auto first = std::make_shared<Service>();
+    home::register_root(first,900,false);
+    home::adopt_library(90,1000);
+    home::LibrarySnapshot snapshot;
+    assert(home::library_snapshot(snapshot));
+    assert(snapshot.pid==900 && snapshot.object==90);
+    assert(home::matches_library(snapshot));
+    auto next_nro = std::make_shared<Service>();
+    home::register_root(next_nro,900,false);
+    assert(home::matches_library(snapshot));
+    auto foreign = std::make_shared<Service>();
+    home::register_root(foreign,901,false);
+    assert(!home::matches_library(snapshot));
+    assert(home::library_snapshot(snapshot));
+    home::adopt_library(91,1001);
+    assert(!home::matches_library(snapshot));
 }

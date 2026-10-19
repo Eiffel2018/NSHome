@@ -14,5 +14,7 @@ Python 3.10+, standard library only. The pairing code is requested privately.
 Input samples enable input, perform a bounded action and attempt OFF afterward.
 Manual HOME arming is a diagnostic control. Version 0.1.8 provides PC game start
 with automatic user selection, Breeze return and HOME activation. Bounded device
-checks also passed for background BP and instruction stepping. Generic NRO launch
-is unsupported. These samples do not use 6801.
+checks also passed for background BP and instruction stepping. Version 0.1.9 adds
+SD NRO launch, replacing the current Album NRO internally. Check the queued request
+with sample 02; do not send another launch while its result is unknown.
+These samples do not use 6801.

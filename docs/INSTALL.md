@@ -1,4 +1,4 @@
-# NSHome 0.1.8 installation
+# NSHome 0.1.9 installation
 
 Experimental release, tested on one console with Breeze beta125.05 and gen2 v0.20.
 Other firmware/game combinations are not yet verified.
@@ -11,7 +11,7 @@ Other firmware/game combinations are not yet verified.
    separately at `switch/Breeze/Breeze.nro`. Enable PC connect in its Settings
    and choose your own pairing code. NSHome reads the same `[PC connect]`
    settings from `switch/Breeze/config.ini`; restart after changing them.
-3. Copy only the ZIP's `atmosphere` folder to the SD root and reboot.
+3. Copy the ZIP's `atmosphere` and `switch` folders to the SD root and reboot.
    Original Nintendo HOME should appear. The module is
    `atmosphere/contents/00FF4E5348414D01/exefs.nsp`; `flags/boot2.flag` enables it.
 4. For BP/trace, install Breeze's compatible gen2 fork using Breeze Settings.
@@ -35,10 +35,12 @@ NSHome selects the first system-listed user, starts the game, initializes Breeze
 and returns to the game. HOME switches to that same Breeze and back. No manual
 `home arm` or polling script to reopen Breeze is needed.
 
-Start with no game running. An identified retained Breeze can be handed back
-normally before the next PC start; unrelated active applets are rejected as busy.
-Manual console/6801 game starts keep their native behavior. Generic 6802 NRO
-launch is unsupported. [6802 samples and parameters](REMOTE_6802.md) cover all commands.
+Start with no game running. The current Album NRO is replaced internally;
+unrelated library applets are rejected as busy. Manual console/6801 game starts
+keep their native behavior. Use sample 14 with `--path /switch/Breeze/Breeze.nro`
+to open Breeze directly, or another existing SD NRO path. Follow the queued request
+with sample 02 rather than resending it.
+[6802 samples and parameters](REMOTE_6802.md) cover all commands.
 
 ## Background BP and trace
 
@@ -63,17 +65,17 @@ to return to qlaunch. `home off` only disables HOME interception; it does not
 close the retained applet. The optional [Return to HOME NRO](../tools/return_to_home/README.md)
 uses the library-applet exit path. It passed a device check from NSHome's
 retained hbmenu to stock qlaunch and System Settings, with the game retained.
-Source builds include the tool under `switch/`; copy that folder to the SD
-root too. The published 0.1.8 ZIP does not include it. Reboot remains a
+Version 0.1.9 includes the tool under `switch/`; copy that folder to the SD
+root too. Reboot remains a
 recovery option if the tool is unavailable.
 
 ## Limits and removal
 
-Only bounded main-menu tests have passed: background BP, 16 instruction steps,
-continue, HOME round trips, cold launch and retained-Breeze relaunch. Long-running
-traces, sleep/wake, other game applets and general exit/chainload need more testing.
-An uninterrupted step-into endurance probe returned UI busy after 529 instructions;
-unrestricted long traces have not passed. See [the observed failure](LAUNCH.md).
+Tests cover main-menu background BP/stepping, continue, HOME round trips, cold
+launch and retained-Breeze relaunch. A ten-minute trace completed, including
+resolution of two late UI replies; it mostly remained in one instruction loop.
+Sleep/wake, other game applets and general exit/chainload remain unverified.
+See [validation limits](LAUNCH.md).
 The existing 6801 Stop game command can display Nintendo's software-closed dialog.
 Never replay an input or launch whose outcome is unknown.
 

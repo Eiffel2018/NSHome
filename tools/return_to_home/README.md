@@ -15,5 +15,7 @@ System Settings opened and the game remained running; no save was loaded and
 no debugger was attached. No reboot was needed. This is one console/game case,
 not an Application Mode or general applet compatibility test.
 
-SD installation: `switch/ReturnToHOME.nro`. This optional tool is not part of
-the published 0.1.8 ZIP.
+SD installation: `switch/ReturnToHOME.nro`, included in the 0.1.9 ZIP. Version
+0.1.9 also passed direct 6802 launch from its retained hbmenu: original qlaunch
+appeared with the same game still running. The module sends stock HOME notification
+after its owned tool finishes so qlaunch restores its UI.

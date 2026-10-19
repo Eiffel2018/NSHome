@@ -25,6 +25,7 @@ static bool g_sdMounted = false;
 static uint64_t g_ticket = 0, g_sequence = 0;
 static char g_loadedPath[512];
 static bool g_first = true;
+static char g_firstPath[512] = NSH_BREEZE_PATH;
 
 static bool g_isAutomaticGameplayRecording = 0;
 static enum {
@@ -55,7 +56,7 @@ Result g_lastRet = 0;
 
 void __attribute__((noreturn)) nroEntrypointTrampoline(const ConfigEntry* entries, u64 handle, u64 entrypoint);
 
-/* NSHome-specific: a one-shot ticket fences this fixed Breeze launch.
+/* NSHome-specific: a one-shot ticket fences the requested SD NRO launch.
  * Later normal NRO replacement remains hbloader's own loop / envSetNextLoad. */
 static Result recordLoad(unsigned ready, Result result)
 {
@@ -72,7 +73,15 @@ static Result recordLoad(unsigned ready, Result result)
     value.ready = ready; value.result = result;
     svcGetProcessId(&value.pid, CUR_PROCESS_HANDLE);
     memcpy(value.path, g_loadedPath, sizeof(value.path));
-    FILE *file = fopen(NSH_LOADER_RECEIPT, "wb");
+    // The launch worker may briefly hold the previous receipt open for reading.
+    // HOS can refuse a simultaneous writer; retry only this metadata open,
+    // before any bytes are written, rather than aborting a mapped NRO.
+    FILE *file = NULL;
+    for (unsigned attempt = 0; attempt < 20; ++attempt) {
+        file = fopen(NSH_LOADER_RECEIPT, "wb");
+        if (file) break;
+        svcSleepThread(10000000);
+    }
     if (!file) rc = MAKERESULT(Module_HomebrewLoader, 28);
     else {
         const bool wrote = fwrite(&value, sizeof(value), 1, file) == 1;
@@ -88,8 +97,12 @@ static Result receiveTicket(void)
 {
     FILE *file = fopen(NSH_LOADER_TICKET, "rb");
     if (!file) return MAKERESULT(Module_HomebrewLoader, 28);
-    const bool valid = fread(&g_ticket, sizeof(g_ticket), 1, file) == 1 &&
-                       fgetc(file) == EOF && g_ticket != 0;
+    NshLoaderTicket value = {0};
+    const size_t count = fread(&value, 1, sizeof(value), file);
+    NshLoaderTicket decoded;
+    // Also accepts the previous module's Breeze-only eight-byte ticket.
+    const bool valid = fgetc(file) == EOF && nshLoaderTicketDecode(&value, count, &decoded);
+    if (valid) { g_ticket = decoded.ticket; memcpy(g_firstPath, decoded.path, sizeof(g_firstPath)); }
     fclose(file);
     if (remove(NSH_LOADER_TICKET) != 0 || R_FAILED(fsdevCommitDevice("sdmc")) || !valid)
         return MAKERESULT(Module_HomebrewLoader, 28);
@@ -421,7 +434,7 @@ void loadNro(void)
         if (R_FAILED(rc)) abortNroLoad(rc);
     }
     if (g_nextNroPath[0] == '\0') {
-        const char *target = g_first ? NSH_BREEZE_PATH : "sdmc:/hbmenu.nro";
+        const char *target = g_first ? g_firstPath : "sdmc:/hbmenu.nro";
         snprintf(g_nextNroPath, sizeof(g_nextNroPath), "%s", target);
         snprintf(g_nextArgv, sizeof(g_nextArgv), "\"%s\"", target);
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""NRO launch protocol example; current module returns launch-bridge-unavailable."""
+"""Queue an SD NRO (NSHome 0.1.9+); use status to check the same request ID."""
 from _common import parser, run, ranged, BUTTONS, STACKS, buttons, nro_path, Path
 
 

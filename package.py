@@ -12,6 +12,8 @@ build = root / 'build'
 verify(build / 'am-observer.elf', build / 'exefs.nsp', build / 'disassembly.txt')
 if not json.loads((build / 'verification.json').read_text())['launch_bridge_connected']:
     raise ValueError('Rebuild the module with the game launch bridge before packaging')
+if not json.loads((build / 'verification.json').read_text()).get('nro_launch_connected'):
+    raise ValueError('Rebuild the matched module and loader with NRO launch support')
 destination = Path(sys.argv[1]).resolve()
 if destination.exists():
     raise FileExistsError(destination)

@@ -1,4 +1,4 @@
-# PC game launch and background Breeze (0.1.8)
+# PC launch and background Breeze (0.1.9)
 
 This experimental release keeps stock qlaunch. It remains
 installed and owns applications. Source `43c5a28` passed bounded device checks:
@@ -13,37 +13,17 @@ HOME transitions retained the same game and Breeze processes. A new PC start
 from the retained Breeze also passed in about 4.5 seconds. No save was loaded.
 This verifies bounded stepping, not long-running unattended tracing.
 
-A later uninterrupted step-into endurance probe stopped progressing after 529
-successful instructions (about 53 seconds): the next 6801 request returned UI
-busy. The last observed PC was main+0x7F5748, in an exclusive-load/compare
-sequence. This identifies where the failure occurred, not its cause. Breeze
-subsequently answered again; no game/module crash was observed, and debugger
-ownership and instructions were cleaned up. Unrestricted long step-into traces
-have therefore not passed. Repeated short capture and sleep/wake tests are separate.
-
-A separate repeated-capture endurance probe also returned UI busy after 102
-16-instruction captures (1,632 steps, about 262 seconds), during the next capture.
-This probe did not traverse the earlier exclusive sequence. Both modes recovered,
-but neither completed the requested ten minutes; the failure cause is unresolved.
-
-A third probe resolved three late step replies by reading debugger state without
-replaying the step. It reached 4,477 steps (about 508 seconds), then lost both
-6801 and 6802 connectivity. Neutral virtual-stick input had been used to keep
-the console active. The final observed debugger state was stopped with no BPs;
-cleanup could not initially be confirmed after disconnection. The operator then
-confirmed the console had slept. After wake, the same processes remained; the
-debugger was detached with no BP/watch/stop, original bytes matched, and a HOME
-round trip passed. This probe still failed the ten-minute target. Most steps stayed in an atomic-operation loop, so it does
-not establish broad game-code coverage.
-
-An actual sleep/wake cycle showed network loss and recovery, but the console
-soon slept again. With keep-active input after a further wake, HOME round trips
-retained the same game/Breeze processes and a background BP hit. Autonomous
-sleep/wake stability remains unverified.
+A subsequent test with the five-second BZOV acknowledgement window completed
+600 seconds and 5,670 step-into operations. Two late replies were resolved by
+reading debugger state without replaying a step. Cleanup verified no attached
+or stopped debugger, no breakpoints and restored original instructions. Most
+steps stayed in an atomic-operation loop; this is not broad game-code coverage.
+Earlier runs encountered UI timeouts and sleep. Sleep/wake stability remains
+unverified and is outside the current release acceptance scope.
 
 The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
-foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
+foreground, it sends EnterHidden and waits at most 5 seconds for its matching
 Ack. This stops Breeze rendering to the hidden applet window, which otherwise
 blocks its UI/debug loop. HOME back to the normal applet first uses EnterNormal.
 Acknowledgements are handled by the launch worker after the AM relay responds,
@@ -145,5 +125,25 @@ containers and program IDs. These tests do not emulate proprietary qlaunch.
 The bounded device check used firmware 22.5.0, Breeze beta125.05 and one game
 (0100005027A18000), stopping at its main menu without loading a save. General
 firmware/game compatibility is not established. Remaining checks include multiple
-accounts, unchanged manual/6801 starts, cancellation, normal exit, sleep/wake,
-long-running continuous tracing and controller behavior across process boundaries.
+accounts, unchanged manual/6801 starts, cancellation, normal exit, sleep/wake and controller behavior across process boundaries.
+
+## SD NRO launch
+
+Version 0.1.9 connects `launch PATH` to the owned loader using a versioned ticket
+containing the requested SD path and a nonce. The loader validates the path and
+records the mapped path, process, sequence and result. The worker checks the
+matching receipt before completing that request. Breeze additionally requires
+its authenticated 6801 identity; other NROs do not require a Breeze server.
+
+A new launch validates the file before replacing the current Album slot. Only a
+verified PhotoViewer accessor can be replaced. It requests normal exit, then
+uses the same accessor's bounded exit-or-terminate path if necessary. Other
+library applets and changed qlaunch sessions are rejected. No client Stop NRO
+command is required, and the running game is retained.
+
+Device checks for the 0.1.9 module/loader passed cold Breeze launch, PC game
+start from that Breeze, hbmenu replacement, Return to HOME with the same game
+retained, and reopening Breeze with automatic HOME arming. A nonexistent path
+failed before replacing the current NRO. No save was loaded. An earlier candidate
+hit a receipt-file open failure; the loader now bounds retries of that metadata
+open before writing, without retrying the NRO launch itself.

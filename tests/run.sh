@@ -17,6 +17,8 @@ g++ "${flags[@]}" -Isource tests/launch_policy_test.cpp -o build/tests/launch_po
 build/tests/launch_policy
 g++ "${flags[@]}" -Isource tests/launch_handoff_test.cpp -o build/tests/launch_handoff
 build/tests/launch_handoff
+g++ "${flags[@]}" -Isource tests/loader_ticket_test.cpp -o build/tests/loader_ticket
+build/tests/loader_ticket
 
 g++ "${flags[@]}" -Isource tests/breeze_background_test.cpp -o build/tests/breeze_background
 build/tests/breeze_background

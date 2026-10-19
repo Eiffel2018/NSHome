@@ -117,6 +117,8 @@ def verify(elf_path, nsp_path, disassembly_path):
     require(real_calls == ['__wrap_' + FORWARD], 'exactly one real forward call, only from wrapper')
     wrapped = [source for source, target in calls if target == '__wrap_' + FORWARD]
     require(len(wrapped) >= 2 and all(s != '__wrap_' + FORWARD for s in wrapped), 'root/domain framework forwarding must use wrapper')
+    nro_connected = any('worker' in source and 'launch_nro' in target for source, target in allocator_calls)
+    require(nro_connected, 'launch worker must call the requested NRO consumer')
     receipt = {
         'program_id': f'{PROGRAM_ID:016X}',
         'checks': ['ELF64 AArch64', 'executable entry', 'PFS0', 'NSO bounds', 'NPDM ID', 'linked forwarding branches', 'unified newlib allocation'],
@@ -125,7 +127,8 @@ def verify(elf_path, nsp_path, disassembly_path):
         'hardware_tested': False,
         'launch_bridge_connected': '_ZN8observer6launch5startEv' in functions,
         'launch_flow_hardware_tested': False,
-        'launch_commands': ['gamestart'] if '_ZN8observer6launch5startEv' in functions else [],
+        'nro_launch_connected': nro_connected,
+        'launch_commands': ['gamestart', 'launch'] if '_ZN8observer6launch5startEv' in functions else [],
     }
     (nsp_path.parent / 'verification.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(json.dumps(receipt, indent=2))

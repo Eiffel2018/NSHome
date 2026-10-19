@@ -18,6 +18,12 @@ std::string command(std::string_view line);
 void adopt_library(std::uint32_t object, std::uint64_t started_tick);
 // Only the scoped loader receipt or authenticated identity check may call this.
 bool identify_breeze(std::uint64_t generation, bool game_in_front, bool background = false);
+struct LibrarySnapshot {
+    std::uint64_t qlaunch{}, pid{}, created{};
+    std::uint32_t object{};
+};
+bool library_snapshot(LibrarySnapshot& out);
+bool matches_library(const LibrarySnapshot& value);
 struct Toggle {
     std::uint64_t qlaunch{}, album{}, sequence{};
     std::uint32_t library{}, application{}, functions{};

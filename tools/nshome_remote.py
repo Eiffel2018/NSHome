@@ -181,7 +181,11 @@ class Client:
         return self._exchange('home off')
 
     def launch(self, path):
-        """Currently raises RemoteError: ERR launch-bridge-unavailable."""
+        """Queue an SD NRO on 0.1.9+; 0.1.8 raises launch-bridge-unavailable.
+
+        Poll status for this request ID. Queued is not proof of NRO readiness.
+        The server replaces the current Album NRO; no Stop-NRO call is needed.
+        """
         return self._exchange('launch ' + nro_path(path))
 
     def game_start(self, title_id):
