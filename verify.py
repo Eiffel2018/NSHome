@@ -89,7 +89,8 @@ def verify(elf_path, nsp_path, disassembly_path):
         if branch:
             allocator_calls.append((owner, branch[1]))
     for source, target in (('_malloc_r', 'malloc'), ('_free_r', 'free'),
-                           ('_calloc_r', 'calloc'), ('_realloc_r', 'realloc')):
+                           ('_calloc_r', 'calloc'), ('_realloc_r', 'realloc'),
+                           ('_memalign_r', 'aligned_alloc')):
         require((source, target) in allocator_calls, f'{source} must use Stratosphere {target}')
     require('_sbrk_r' not in functions, 'newlib sbrk allocator must not be linked')
     require(FORWARD in functions and '__wrap_' + FORWARD in functions, 'real/wrapper symbols')
