@@ -1,4 +1,4 @@
-# Return to HOME proof tool
+# Return to HOME
 
 Build with devkitA64 and libnx: `make`. Run `return-to-home.nro` from hbmenu
 in **Applet Mode**, after ending any debugger session.
@@ -9,5 +9,11 @@ to its caller (normally qlaunch for the Album route). It does not launch or
 replace qlaunch. It refuses to force an exit in Application Mode.
 
 This closes the current homebrew applet; it does not retain Breeze alongside
-hbmenu. Return from NSHome's retained holder still needs device verification.
-This proof tool is not part of the published 0.1.8 ZIP.
+hbmenu. Device verification passed with NSHome 0.1.8 and hbmenu 3.6.1: leave the owned
+Breeze for hbmenu, select Return to HOME, and return to original qlaunch.
+System Settings opened and the game remained running; no save was loaded and
+no debugger was attached. No reboot was needed. This is one console/game case,
+not an Application Mode or general applet compatibility test.
+
+SD installation: `switch/ReturnToHOME.nro`. This optional tool is not part of
+the published 0.1.8 ZIP.

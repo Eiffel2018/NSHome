@@ -60,8 +60,11 @@ alone does not restore that setting. Other boot screen layouts are unverified.
 
 Known issue: after leaving the owned Breeze for hbmenu, HOME and `+` may fail
 to return to qlaunch. `home off` only disables HOME interception; it does not
-close the retained applet. If trapped, reboot and change system settings before
-starting another PC game session. A reliable return-to-qlaunch path is pending.
+close the retained applet. The optional [Return to HOME NRO](../tools/return_to_home/README.md)
+uses the library-applet exit path. It passed a device check from NSHome's
+retained hbmenu to stock qlaunch and System Settings, with the game retained.
+The tool is built separately and is not in the 0.1.8 ZIP. Reboot remains a
+recovery option if the tool is unavailable.
 
 ## Limits and removal
 
