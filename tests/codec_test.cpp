@@ -16,6 +16,17 @@ int main() {
     assert(returned_kind(Kind::LibraryProxy, 20) == Kind::LibrarySelf);
     assert(returned_kind(Kind::LibraryProxy, 0) == Kind::Common);
     assert(returned_kind(Kind::Proxy, 20) == Kind::Home);
+    assert(returned_kind(Kind::Proxy, 23) == Kind::Global);
+    assert(std::strcmp(name(Kind::Global), "global-state") == 0);
+    // Power/idle-policy commands are forwarded scalar calls, not child objects.
+    assert(returned_kind(Kind::Global, 2) == Kind::Unknown);
+    assert(returned_kind(Kind::Global, 9) == Kind::Unknown);
+    assert(returned_kind(Kind::Global, 10) == Kind::Unknown);
+    std::array<std::uint8_t, 20> power_reply{};
+    put(power_reply.data(), OutMagic);
+    put(power_reply.data() + 16, 1);
+    const auto power = reply(power_reply.data(), power_reply.size(), false, false);
+    assert(power.valid && power.scalar == 1 && power.object == 0);
     auto unchanged = bytes;
     for (std::size_t n = 0; n < 16; ++n) assert(!request(bytes.data(), n).valid);
     assert(bytes == unchanged);

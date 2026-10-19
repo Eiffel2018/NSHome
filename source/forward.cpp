@@ -82,6 +82,8 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
         if (reply.valid) {
             record.flags |= 8; record.result = reply.result;
             if (interface == observer::Kind::Common && request.command == 1 && reply.result == 0) record.scalar = reply.scalar;
+            if (interface == observer::Kind::Global && (request.command == 9 || request.command == 14) && reply.result == 0)
+                record.scalar = reply.scalar; // AutoPowerDownRequested / ShouldSleepOnBoot.
             if (interface == observer::Kind::Common && request.command == 1 && reply.result == 0 && reply.scalar == 20 &&
                 observer::home::consume_home(session)) {
                 // Only the explicitly armed, live Breeze/game pair consumes

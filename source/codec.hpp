@@ -6,9 +6,9 @@
 
 namespace observer {
 constexpr std::uint32_t InMagic = 0x49434653, OutMagic = 0x4f434653;
-enum class Kind : std::uint8_t { Unknown, Root, Proxy, Common, Home, AppCreator, LibCreator, Application, Library, Storage, StorageAccessor, LibraryProxy, LibrarySelf };
+enum class Kind : std::uint8_t { Unknown, Root, Proxy, Common, Home, AppCreator, LibCreator, Application, Library, Storage, StorageAccessor, LibraryProxy, LibrarySelf, Global };
 inline const char* name(Kind k) {
-    constexpr const char* names[] = {"unknown", "appletAE", "system-proxy", "common-state", "home-functions", "app-creator", "lib-creator", "application", "library-applet", "general-storage", "storage-accessor", "library-proxy", "library-self"};
+    constexpr const char* names[] = {"unknown", "appletAE", "system-proxy", "common-state", "home-functions", "app-creator", "lib-creator", "application", "library-applet", "general-storage", "storage-accessor", "library-proxy", "library-self", "global-state"};
     return names[static_cast<unsigned>(k)];
 }
 inline std::uint32_t word(const void* p) { std::uint32_t n; std::memcpy(&n, p, 4); return n; }
@@ -64,7 +64,7 @@ inline Kind returned_kind(Kind k, std::uint32_t cmd) {
         switch (cmd) { case 0: return Kind::Common; case 11: return Kind::LibCreator; case 20: return Kind::LibrarySelf; }
     }
     if (k == Kind::Proxy) {
-        switch (cmd) { case 0: return Kind::Common; case 11: return Kind::LibCreator; case 20: return Kind::Home; case 22: return Kind::AppCreator; }
+        switch (cmd) { case 0: return Kind::Common; case 11: return Kind::LibCreator; case 20: return Kind::Home; case 22: return Kind::AppCreator; case 23: return Kind::Global; }
     }
     if (k == Kind::AppCreator && (cmd == 0 || cmd == 1)) return Kind::Application;
     // Stock qlaunch on the test console also obtains this accessor via cmd3.
