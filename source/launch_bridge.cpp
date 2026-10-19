@@ -39,6 +39,7 @@ std::array<Root, 16> roots;
 std::mutex mutex;
 std::uint64_t serial{}, qepoch{}, proven{};
 Policy policy;
+NativeHandoff native_handoff;
 std::uint32_t current_application{};
 bool enabled{};
 ams::os::ThreadType thread;
@@ -347,13 +348,17 @@ Result replace_album(Connection& c, Service& holder, std::uint64_t& holder_gener
     if (R_FAILED(rc)) return rc;
     if (info.appletId != AppletId_LibraryAppletPhotoViewer) return Busy;
     (void)home::command("home off");
-    if (holder_generation && serviceIsActive(&holder) && background_current(c, holder_generation)) {
-        rc = send_background(c, holder, holder_generation, background::Release);
-        if (R_FAILED(rc)) return rc;
-    }
     if (!connection_current(c) || !home::matches_library(snapshot)) return Cancelled;
     rc = serviceDispatch(&c.functions, 10);
-    if (R_SUCCEEDED(rc)) rc = serviceDispatch(&previous, 20); // RequestExit once.
+    if (R_FAILED(rc)) return rc;
+    if (holder_generation && serviceIsActive(&holder) && background_current(c, holder_generation)) {
+        rc = send_background(c, holder, holder_generation, background::Release);
+        // An explicit exit must also work when Breeze's UI cannot acknowledge.
+        // The same verified Album accessor still gets native exit-or-terminate.
+        if (R_FAILED(rc)) startup(98, rc);
+    }
+    if (!connection_current(c) || !home::matches_library(snapshot)) return Cancelled;
+    rc = serviceDispatch(&previous, 20); // RequestExit once.
     if (R_FAILED(rc)) return rc;
     bool done = false;
     const auto wait_complete = [&](std::uint64_t timeout) -> Result {
@@ -448,6 +453,28 @@ void worker(void*) {
         auto time = now();
         const auto connected = connection.open();
         if (R_SUCCEEDED(connected)) background_tick(connection, holder, holder_generation);
+        NativeIntent native{};
+        bool handoff = false;
+        {
+            std::scoped_lock lock(mutex);
+            const auto* a = latest_album();
+            handoff = native_handoff.take(connection.epoch, a ? a->pid : 0, policy.pending(), native);
+        }
+        if (handoff && R_SUCCEEDED(connected) && serviceIsActive(&holder)) {
+            home::LibrarySnapshot snapshot{};
+            if (home::library_snapshot(snapshot) && snapshot.qlaunch == native.epoch &&
+                snapshot.pid == native.pid && snapshot.object == holder.object_id) {
+                { std::scoped_lock lock(mutex); policy = {}; }
+                const auto rc = replace_album(connection, holder, holder_generation);
+                startup(97, rc, native.reason == NativeReason::Launch ? 50 : 20);
+                if (R_SUCCEEDED(rc) && native.reason == NativeReason::Home && connection_current(connection)) {
+                    const u32 button = AppletSystemButtonType_HomeButtonShortPressing;
+                    startup(99, serviceDispatchIn(&connection.debug, 10, button));
+                }
+                // Native launch message 50 is already queued in qlaunch.
+                // Never issue another game launch or select a user here.
+            }
+        }
         nshome::remote::Request request;
         if (nshome::remote::take(request)) {
             if (request.kind == nshome::remote::RequestKind::Nro) {
@@ -576,7 +603,7 @@ void worker(void*) {
                 // qlaunch does not own the cloned creator's UI bookkeeping.
                 // A generic tool's ExitProcessAndReturn therefore also needs
                 // its real parent brought forward after completion.
-                if (state.phase == Phase::Idle && R_SUCCEEDED(connected) && connection_current(connection)) {
+                if (R_SUCCEEDED(connected) && connection_current(connection)) {
                     const u32 button = AppletSystemButtonType_HomeButtonShortPressing;
                     const auto rc = serviceDispatchIn(&connection.debug, 10, button);
                     startup(96, rc);
@@ -586,6 +613,12 @@ void worker(void*) {
         if (!signalled.exchange(false)) ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(100));
     }
 }
+}
+void request_stock_home(const void* session) {
+    if (!home::is_qlaunch(session)) return;
+    std::scoped_lock lock(mutex);
+    const auto* a = latest_album();
+    if (a && !policy.pending()) native_handoff.request(qepoch, a->pid, NativeReason::Home);
 }
 void wake() { signalled.store(true); }
 bool start() {
@@ -649,7 +682,11 @@ void observe(const void* session, Kind kind, const Request& request, const Reply
     if (!source->qlaunch) return;
     if (kind == Kind::Common && request.command == 1 && (reply.scalar == 20 || reply.scalar == 25)) policy.cancel();
     // Message 50 remains visible to stock qlaunch, which owns the launch and selector logic.
-    if (kind == Kind::Common && request.command == 1 && reply.scalar == 50) startup(67, 0, policy.pending());
+    if (kind == Kind::Common && request.command == 1 && reply.scalar == 50) {
+        startup(67, 0, policy.pending());
+        const auto* a = latest_album();
+        if (a && !policy.pending()) native_handoff.request(qepoch, a->pid, NativeReason::Launch);
+    }
     if (kind == Kind::AppCreator && reply.object) {
         current_application = reply.object;
         if (policy.phase == Phase::Requested) {

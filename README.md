@@ -5,6 +5,11 @@ qlaunch and switches HOME between a running game and the same resident Breeze.
 
 ## Download and install
 
+**0.1.9 has reported serious qlaunch/DBI regressions and is not recommended for
+normal use.** Returning to stock HOME and DBI's L3 NSP launch can require a reboot.
+The source contains a candidate fix; it has compiled and passed host checks but
+has not yet passed the affected DBI workflow on hardware.
+
 Download `NSHome-v0.1.9.zip` from the [0.1.9 preview](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.9).
 Copy both `atmosphere` and `switch` to the SD root and reboot.
 Read [installation and requirements](docs/INSTALL.md) first, including disabling

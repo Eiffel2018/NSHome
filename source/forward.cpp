@@ -94,6 +94,9 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
                 std::memcpy(payload + 16, &zero, 4);
                 record.flags |= 0x400;
             }
+            else if (interface == observer::Kind::Common && request.command == 1 && reply.result == 0 && reply.scalar == 20) {
+                observer::launch::request_stock_home(session);
+            }
             if (reply.object && child_kind != observer::Kind::Unknown) {
                 remember(session, reply.object, child_kind); record.child = reply.object;
             }

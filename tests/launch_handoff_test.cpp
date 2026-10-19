@@ -3,6 +3,20 @@
 #include <cassert>
 using namespace observer::launch;
 int main() {
+    NativeHandoff native;
+    NativeIntent intent;
+    native.request(1,10,NativeReason::Home);
+    assert(native.take(1,10,false,intent) && intent.reason==NativeReason::Home);
+    assert(!native.take(1,10,false,intent)); // one native handoff only
+    native.request(1,10,NativeReason::Launch);
+    native.request(1,10,NativeReason::Home);
+    assert(native.take(1,10,false,intent) && intent.reason==NativeReason::Launch);
+    native.request(1,10,NativeReason::Launch);
+    assert(!native.take(2,10,false,intent)); // qlaunch replaced
+    native.request(1,10,NativeReason::Home);
+    assert(!native.take(1,11,false,intent)); // a different NRO process
+    native.request(1,10,NativeReason::Launch);
+    assert(!native.take(1,10,true,intent)); // explicit PC transaction owns its flow
     const HandoffSnapshot home{1,0,false,false,true};
     Handoff cold(home,0);assert(cold.next(home,1)==HandoffAction::Ready);
     HandoffSnapshot breeze{1,2,true,true,false};

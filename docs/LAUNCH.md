@@ -1,5 +1,23 @@
 # PC launch and background Breeze (0.1.9)
 
+## Reported regression and source candidate
+
+Normal use exposed failures returning to qlaunch and launching an NSP with L3 in
+DBI. The earlier bounded checks used explicit 6802 launch/ReturnToHOME requests;
+they did not establish that the native hbmenu/DBI exit route worked.
+
+The candidate worker also releases its own verified Album holder when stock
+qlaunch receives a native launch request (message 50), without issuing another
+launch or choosing a user. Unconsumed stock HOME releases an owned non-paired
+Album holder. Completion restores HOME after a PC game transaction too, not just
+after a generic NRO request. A pending PC transaction or changed qlaunch/NRO
+identity invalidates the deferred handoff. Release acknowledgement failure does
+not prevent a bounded native exit of the same verified holder.
+
+Host checks and native compilation passed; actual DBI L3 and native HOME
+verification is still required. Do not treat this source candidate as a validated
+fix or install it while another user owns the console.
+
 This experimental release keeps stock qlaunch. It remains
 installed and owns applications. Source `43c5a28` passed bounded device checks:
 automatic user selection, game launch, authenticated Breeze initialization,

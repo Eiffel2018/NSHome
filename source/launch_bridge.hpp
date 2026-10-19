@@ -4,6 +4,7 @@
 #include <memory>
 struct Service;
 namespace observer::launch {
+void request_stock_home(const void* session);
 bool start();
 void wake();
 void network_tick(const char* pairing_code); // Called only by the BSD-owning 6802 worker.

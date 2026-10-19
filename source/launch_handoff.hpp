@@ -2,6 +2,29 @@
 #pragma once
 #include <cstdint>
 namespace observer::launch {
+enum class NativeReason { Home, Launch };
+struct NativeIntent {
+    std::uint64_t epoch{}, pid{};
+    NativeReason reason{};
+};
+// Stock HOME/launch requests supersede only the same retained Album process.
+class NativeHandoff {
+    NativeIntent intent_{};
+public:
+    void request(std::uint64_t epoch, std::uint64_t pid, NativeReason reason) {
+        if (!epoch || !pid) return;
+        if (intent_.epoch == epoch && intent_.pid == pid && intent_.reason == NativeReason::Launch)
+            return; // HOME must not replace an already queued native launch.
+        intent_ = {epoch, pid, reason};
+    }
+    bool take(std::uint64_t epoch, std::uint64_t pid, bool pc_pending, NativeIntent& out) {
+        const auto value = intent_;
+        intent_ = {};
+        if (!value.epoch || value.epoch != epoch || value.pid != pid || pc_pending) return false;
+        out = value;
+        return true;
+    }
+};
 struct HandoffSnapshot {
     std::uint64_t epoch{}, album{};
     bool identified{}, library_active{}, qlaunch_in_focus{};
