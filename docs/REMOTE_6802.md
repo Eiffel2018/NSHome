@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (0.1.8 development candidate), not
+This reference describes the current NSHome source (0.1.8 experimental release), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -59,7 +59,7 @@ authenticated connection for each command.
 | [12_home_arm.py](../samples/12_home_arm.py) | Required `--generation` positive decimal, at most 19 digits | `home arm GENERATION`; experimental, manual identity check required |
 | [13_home_off.py](../samples/13_home_off.py) | None | `home off`; stops HOME interception, module continues running |
 | [14_launch_nro.py](../samples/14_launch_nro.py) | Required `--path` absolute SD .nro path | `launch PATH`; **currently ERR launch-bridge-unavailable** |
-| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow in the 0.1.8 candidate; bounded device check passed, background debugging pending |
+| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow; bounded launch, background BP/stepping and HOME checks passed |
 | [16_home_button.py](../samples/16_home_button.py) | `--ms` 1..1000 default 100 | `press HOME MS`; presses HOME, does not enable HOME switching |
 | [17_capture_button.py](../samples/17_capture_button.py) | `--ms` 1..1000 default 100 | `press CAPTURE MS`; console Album workflow, no JPEG response to PC |
 
@@ -100,7 +100,7 @@ with `sdmc:`. Spaces are preserved; quote the entire path in a shell. Canonical
 UTF-8 path length must be less than 512 bytes. Traversal components, duplicate
 slashes, backslashes, quotes, colons inside the path and control bytes are rejected.
 Generic NRO launch remains unsupported. Game launch is queued by the 0.1.8
-candidate; the installed 0.1.7 build still rejects it. Neither example falls
+release; version 0.1.7 rejects it. Neither example falls
 back to another port:
 
 ```sh
@@ -117,7 +117,7 @@ same request ID: `queued`/`launching` is pending, `started` means the automatic
 return reached its loader/session milestone, and `failed` includes a nonzero
 result. A failed return can leave the game running; never resend a start merely
 because return timed out. `started` is not proof of a game's menu being ready.
-No capture/click loop or PC command to reopen Breeze is required by the candidate.
+No capture/click loop or PC command to reopen Breeze is required.
 
 Manual console launches and unmarked 6801 launches retain stock behavior.
 The 6801 AM request does not prove PC origin, so NSHome does not guess from

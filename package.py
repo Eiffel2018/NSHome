@@ -24,17 +24,20 @@ files = {
     folder + 'breeze_loader/main.npdm': (build / 'breeze_loader/main.npdm').read_bytes(),
     folder + 'breeze_loader/LICENSE.md': (root / 'loader/LICENSE.md').read_bytes(),
     'README.md': (root / 'README.md').read_bytes(),
+    'INSTALL.md': (root / 'docs/INSTALL.md').read_bytes(),
     'docs/DEVELOPMENT.md': (root / 'docs/DEVELOPMENT.md').read_bytes(),
     'NOTICE.md': (root / 'NOTICE.md').read_bytes(),
     'LICENSE': (root / 'LICENSE').read_bytes(),
     'verification.json': (build / 'verification.json').read_bytes(),
+    'extras/auto-unlock/config/NSHome/boot-touch-once.flag': b'',
+    'extras/auto-unlock/config/NSHome/skip-lock-screen.flag': b'',
 }
 # Include the runnable PC samples alongside their shared client and reference.
 for pattern in ('samples/*.py', 'samples/*.md', 'tools/nshome_remote.py', 'docs/REMOTE_6802.md', 'docs/LAUNCH.md'):
     for path in root.glob(pattern):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
 # Include corresponding module source and the pinned dependency build recipe.
-for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/*.py', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md', 'tools/nshome_remote.py', 'tools/unpack_loader.py', 'loader/Makefile', 'loader/hbl.json', 'loader/LICENSE.md', 'loader/source/*.c', 'loader/source/*.s', 'samples/*.py', 'samples/*.md'):
+for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/*.py', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md', 'tools/*.py', 'loader/Makefile', 'loader/hbl.json', 'loader/LICENSE.md', 'loader/source/*.c', 'loader/source/*.s', 'samples/*.py', 'samples/*.md'):
     for path in root.glob(pattern):
         if path.is_file():
             files['source/NSHome/' + path.relative_to(root).as_posix()] = path.read_bytes()

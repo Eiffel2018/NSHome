@@ -1,37 +1,36 @@
 # NSHome
 
-An independent Nintendo Switch system module for retaining original qlaunch
-while switching HOME between a running game and a resident Breeze NRO.
-Experimental version: **0.1.8 development candidate** (not released; background debugging is not accepted).
-Bounded game-launch and HOME-switching checks passed on one test console. This is a standalone repository, with
-no hbmenu UI, assets or inherited Git history.
+An independent Nintendo Switch system module that keeps original Nintendo
+qlaunch and switches HOME between a running game and the same resident Breeze.
 
-## Current behavior
+## Download and install
 
-- Original qlaunch remains installed; module Program ID: `00FF4E5348414D01`.
-- Authenticated TCP 6802 provides controls, touch, capture and diagnostics.
-- The development candidate adds PC6802 game launch with automatic first-user
-  selection, delayed Breeze return and HOME arming. Manual/6801 starts retain
-  their original behavior. See [the launch implementation and pending checks](docs/LAUNCH.md).
-- One automatic cold-boot touch unlock passed device verification.
-- Automatic PC6802 launch selected a user, restored Breeze, resumed the game,
-  and retained the same Breeze process across HOME round trips.
-- Earlier 0.1.7 manually armed tests included a background breakpoint hit and
-  pending single step; those results do not validate the new automatic flow.
+Download `NSHome-v0.1.8.zip` from the [0.1.8 release](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.8).
+Copy its `atmosphere` folder to the SD root and reboot.
+Read [installation and requirements](docs/INSTALL.md) first, including disabling
+an existing SwitchU HOME replacement. Breeze is installed separately.
 
-This is not a finished HOME replacement. Background debugging, continuous trace,
-manual-launch regression and general exit/chainload behavior still need validation.
-In the tested automatic flow, hidden Breeze `state`/`dbg` RPC returned busy;
-these calls recovered when HOME brought the same Breeze back into focus. Stock qlaunch suspends the game while
-Breeze is in front. Generic 6802 NRO launch remains unsupported.
+## Features
 
-## Python examples
+- Original qlaunch; independent module ID `00FF4E5348414D01`.
+- Authenticated TCP 6802 controls, touch and JPEG capture, independent of Breeze UI.
+- PC6802 game start selects the first system-listed user, initializes Breeze,
+  returns to the game and automatically enables HOME switching.
+- Breeze's existing background-render handshake keeps its UI/debug loop active
+  while the game owns foreground. Background BP hit, 16 instruction steps,
+  continue and HOME round trips passed on the test console.
+- Optional visually checked boot touch unlock.
+- [17 Python samples and all 6802 options](samples/README.md), standard library only.
 
-See the [complete TCP 6802 feature and parameter reference](docs/REMOTE_6802.md)
-and [17 runnable Python samples](samples/README.md). They cover authentication,
-status, input controls, buttons/chords, sticks, touch, JPEG capture and experimental
-HOME controls. Game launch describes the new candidate; generic NRO launch is unsupported.
-Python 3.10+ and its standard library are sufficient.
+This first release is experimental. Tests used Breeze beta125.05, gen2 v0.20 and
+one game at its main menu, without loading a save. Other firmware/games,
+multiple accounts, sleep and general applet/exit compatibility need further testing.
+See [launch behavior and validation limits](docs/LAUNCH.md).
+
+Automatic user/Breeze handling applies to explicit 6802 game starts. Manual
+console and 6801 starts retain their original behavior. Generic NRO launch over
+6802 remains unsupported. Normal foreground Breeze pauses the game; use game
+foreground for instruction stepping. Breeze may display its own overlay on a BP hit.
 
 ## Build and test
 
@@ -52,12 +51,9 @@ bash build.sh
 python3 package.py /absolute/path/to/NSHome.zip
 ```
 
-See [development and installation notes](docs/DEVELOPMENT.md) for build-image
-pins, experimental arming, boot flags and recovery. Disable any SwitchU qlaunch
-override before installing this module. 
+See [development notes](docs/DEVELOPMENT.md) for pinned build tools and recovery.
 
 ## License
 
-[GPL-2.0-only](LICENSE). Specific SwitchU mechanisms and other dependencies
-are credited in [NOTICE.md](NOTICE.md); their original licenses are retained.
-No Nintendo code, firmware, keys, fonts or pairing configuration is included.
+[GPL-2.0-only](LICENSE). Upstream mechanisms are credited in [NOTICE.md](NOTICE.md).
+No Nintendo code, firmware, keys, Breeze binary or pairing configuration is bundled.

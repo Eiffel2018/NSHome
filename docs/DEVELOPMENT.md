@@ -30,23 +30,24 @@ Original Nintendo qlaunch remains in use.
 
 TCP6802 uses `switch/Breeze/config.ini`, section `[PC connect]`.
 Controls, touch, capture and diagnostics work independently of Breeze6801.
-The 0.1.8 development candidate adds PC6802 game launch; generic NRO launch still
+Version 0.1.8 provides PC6802 game launch; generic NRO launch still
 returns `launch-bridge-unavailable`. Version 0.1.7 rejects both.
 The matched Breeze loader pair above is required for automatic return.
 See [launch behavior, origin rules and pending checks](LAUNCH.md).
 Use bounded input pulses, disable the input gate afterwards, and never replay
 an input whose result is unknown.
 
-The candidate automatically arms after its scoped PC6802 launch verifies Breeze.
+The module automatically arms after its scoped PC6802 launch verifies Breeze.
 For the separate manual diagnostic control, with Breeze in front,
 verify its6801 service, then send authenticated6802 `home status` followed by
 `home arm GENERATION`, using the current `album` generation. A live game is
 required. `home off` restores ordinary HOME handling. Session closure or observed
 completion disarms switching; other NROs are not automatically armed.
 
-Hidden Breeze UI/debug RPC may return busy. Stock qlaunch suspends the game
-behind Breeze; pending Step may require game foreground. The new automatic flow,
-continuous trace and general exit/chainload behavior still need hardware checks.
+The BZOV handshake keeps compatible Breeze UI/debug RPC active behind the game.
+A background BP and 16 instruction steps passed, followed by Continue and HOME
+round trips. Stock qlaunch suspends the game behind normal foreground Breeze;
+step with the game foreground. Long traces and general exit/chainload remain unverified.
 
 ## Boot unlock and recovery
 

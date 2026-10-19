@@ -1,24 +1,26 @@
-# PC game launch candidate (0.1.8)
+# PC game launch and background Breeze (0.1.8)
 
-This is a development candidate, not a published release. Stock qlaunch remains
+This experimental release keeps stock qlaunch. It remains
 installed and owns applications. Source `43c5a28` passed bounded device checks:
 automatic user selection, game launch, authenticated Breeze initialization,
 return to the game and HOME round trips to the same Breeze process, including
 a second PC start while the previous game's retained Breeze was foreground.
 
-Background debugging is not accepted. Hidden Breeze `state` and `dbg` requests
-returned UI busy; they recovered when that same process returned to the foreground.
-No background breakpoint or continuous-trace claim follows from the launch check.
+Source `4e66012` additionally passed background BP and a 16-instruction trace.
+The game retained foreground throughout the hit, all steps and Continue; the
+temporary BP was cleared and original instructions read back unchanged. Four
+HOME transitions retained the same game and Breeze processes. A new PC start
+from the retained Breeze also passed in about 4.5 seconds. No save was loaded.
+This verifies bounded stepping, not long-running unattended tracing.
 
-The background-render candidate additionally uses Breeze's existing BZOV
+The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
 foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
 Ack. This stops Breeze rendering to the hidden applet window, which otherwise
 blocks its UI/debug loop. HOME back to the normal applet first uses EnterNormal.
 Acknowledgements are handled by the launch worker after the AM relay responds,
 without holding relay locks. Session changes invalidate pending transitions;
-missing Acks disarm the pair without replaying a foreground request. These
-changes require device validation before release. The optional capability is
+missing Acks disarm the pair without replaying a foreground request. The optional capability is
 read only after the owned loader and authenticated Breeze identity are proven.
 
 ## Origin and behavior
@@ -115,5 +117,5 @@ containers and program IDs. These tests do not emulate proprietary qlaunch.
 The bounded device check used firmware 22.5.0, Breeze beta125.05 and one game
 (0100005027A18000), stopping at its main menu without loading a save. General
 firmware/game compatibility is not established. Remaining checks include multiple
-accounts, unchanged manual/6801 starts, cancellation, normal exit, background
-breakpoints/continuous tracing and controller behavior across process boundaries.
+accounts, unchanged manual/6801 starts, cancellation, normal exit, sleep/wake,
+long-running continuous tracing and controller behavior across process boundaries.
