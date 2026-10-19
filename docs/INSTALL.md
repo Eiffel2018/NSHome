@@ -63,7 +63,8 @@ to return to qlaunch. `home off` only disables HOME interception; it does not
 close the retained applet. The optional [Return to HOME NRO](../tools/return_to_home/README.md)
 uses the library-applet exit path. It passed a device check from NSHome's
 retained hbmenu to stock qlaunch and System Settings, with the game retained.
-The tool is built separately and is not in the 0.1.8 ZIP. Reboot remains a
+Source builds include the tool under `switch/`; copy that folder to the SD
+root too. The published 0.1.8 ZIP does not include it. Reboot remains a
 recovery option if the tool is unavailable.
 
 ## Limits and removal

@@ -4,3 +4,6 @@ __pycache__/
 dist/
 loader/hbl.*
 !loader/hbl.json
+tools/return_to_home/*.elf
+tools/return_to_home/*.nacp
+tools/return_to_home/*.nro

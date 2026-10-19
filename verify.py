@@ -21,6 +21,25 @@ def u32(data, offset):
     return struct.unpack_from('<I', data, offset)[0]
 
 
+def verify_return_nro(data):
+    require(len(data) >= 0x80 and data[0x10:0x14] == b'NRO0', 'return NRO header')
+    image_size = u32(data, 0x18)
+    require(0x80 <= image_size <= len(data) - 0x38, 'return NRO image bounds')
+    for entry in (0x20, 0x28, 0x30):
+        offset, size = struct.unpack_from('<II', data, entry)
+        require(offset <= image_size and size <= image_size - offset, 'return NRO segment bounds')
+    require(data[image_size:image_size + 8] == b'ASET\0\0\0\0', 'return NRO assets')
+    for entry in (8, 24, 40):
+        offset, size = struct.unpack_from('<QQ', data, image_size + entry)
+        if size:
+            require(0x38 <= offset <= len(data) - image_size, 'return NRO asset offset')
+            require(size <= len(data) - image_size - offset, 'return NRO asset bounds')
+    nacp_offset, nacp_size = struct.unpack_from('<QQ', data, image_size + 24)
+    require(nacp_size == 0x4000, 'return NRO NACP size')
+    title = data[image_size + nacp_offset:image_size + nacp_offset + 0x200].split(b'\0', 1)[0]
+    require(title == b'Return to HOME', 'unexpected return NRO title')
+
+
 def pfs(data):
     require(data[:4] == b'PFS0', 'PFS0 magic')
     count, strings_size = struct.unpack_from('<II', data, 4)

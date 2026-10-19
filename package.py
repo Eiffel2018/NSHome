@@ -5,7 +5,7 @@ import json
 import sys
 import zipfile
 from pathlib import Path
-from verify import verify
+from verify import verify, verify_return_nro
 
 root = Path(__file__).resolve().parent
 build = root / 'build'
@@ -16,7 +16,10 @@ destination = Path(sys.argv[1]).resolve()
 if destination.exists():
     raise FileExistsError(destination)
 folder = 'atmosphere/contents/00FF4E5348414D01/'
+return_nro = (root / 'tools/return_to_home/return-to-home.nro').read_bytes()
+verify_return_nro(return_nro)
 files = {
+    'switch/ReturnToHOME.nro': return_nro,
     folder + 'exefs.nsp': (build / 'exefs.nsp').read_bytes(),
     folder + 'mitm.lst': b'appletAE',
     folder + 'flags/boot2.flag': b'',
@@ -37,7 +40,7 @@ for pattern in ('samples/*.py', 'samples/*.md', 'tools/nshome_remote.py', 'docs/
     for path in root.glob(pattern):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
 # Include corresponding module source and the pinned dependency build recipe.
-for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/*.py', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md', 'tools/*.py', 'loader/Makefile', 'loader/hbl.json', 'loader/LICENSE.md', 'loader/source/*.c', 'loader/source/*.s', 'samples/*.py', 'samples/*.md'):
+for pattern in ('source/*', 'res/*', 'tests/*.cpp', 'tests/*.sh', 'tests/*.py', 'tests/**/*.h', 'tests/**/*.hpp', 'docs/*.md', 'tools/*.py', 'tools/return_to_home/main.c', 'tools/return_to_home/Makefile', 'tools/return_to_home/README.md', 'loader/Makefile', 'loader/hbl.json', 'loader/LICENSE.md', 'loader/source/*.c', 'loader/source/*.s', 'samples/*.py', 'samples/*.md'):
     for path in root.glob(pattern):
         if path.is_file():
             files['source/NSHome/' + path.relative_to(root).as_posix()] = path.read_bytes()

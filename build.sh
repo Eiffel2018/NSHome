@@ -10,5 +10,6 @@ test "$actual" = aae2da0155a490abd3bfd17a70ccd16bb73c916a
 make -C "$AMS_LIBRARIES/libstratosphere" nx_release -j4 SETTINGS='$(ATMOSPHERE_SETTINGS) -O2 -Wextra -Werror -Wno-missing-field-initializers -Wno-error=unused-result -fno-lto'
 make AMS_LIBRARIES="$AMS_LIBRARIES" -j4
 make -C loader RELEASE=1 CONFIG_JSON=hbl.json -j4
+make -C tools/return_to_home
 python3 tools/unpack_loader.py loader/hbl.nsp build/breeze_loader
 python3 verify.py build/am-observer.elf build/exefs.nsp build/disassembly.txt
