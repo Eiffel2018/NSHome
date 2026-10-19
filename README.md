@@ -2,7 +2,7 @@
 
 An independent Nintendo Switch system module for retaining original qlaunch
 while switching HOME between a running game and a resident Breeze NRO.
-Experimental version: **0.1.8 offline candidate** (not released or hardware verified).
+Experimental version: **0.1.8 development candidate** (not released; automatic Breeze return is not accepted).
 Previous device evidence belongs to **0.1.7**. This is a standalone repository, with
 no hbmenu UI, assets or inherited Git history.
 

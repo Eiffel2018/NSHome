@@ -54,11 +54,11 @@ struct SavedTls {
     ~SavedTls() { std::memcpy(ams::sf::hipc::GetMessageBufferOnTls(), bytes.data(), bytes.size()); }
 };
 struct Connection {
-    Service connection{}, proxy{}, creator{}, debug{}, functions{};
+    Service connection{}, proxy{}, creator{}, debug{}, functions{}, common{};
     std::uint64_t epoch{};
     ~Connection() { close(); }
     void close() {
-        for (auto* s : { &debug, &functions, &creator }) if (serviceIsActive(s)) serviceClose(s);
+        for (auto* s : { &debug, &common, &functions, &creator }) if (serviceIsActive(s)) serviceClose(s);
         if (serviceIsActive(&connection)) serviceClose(&connection);
         proxy = {}; epoch = 0;
     }
@@ -77,6 +77,7 @@ struct Connection {
         }
         if (R_SUCCEEDED(rc)) rc = child(&proxy, 1000, &debug);
         if (R_SUCCEEDED(rc)) rc = child(&proxy, 20, &functions);
+        if (R_SUCCEEDED(rc)) rc = child(&proxy, 0, &common);
         if (R_FAILED(rc)) close(); else epoch = generation;
         return rc;
     }
@@ -132,8 +133,21 @@ bool receipt(NshLoaderReceipt& value) {
     return ok && value.magic == 0x4c48534e && value.version == 1 && value.path[511] == 0;
 }
 Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
-    if (!valid_nro() || !ticket_file(ticket)) return NotReady;
-    auto rc = register_loader();
+    if (!valid_nro()) return NotReady;
+    // Match the upstream foreground applet runner. An AllForeground child
+    // must not be started while its qlaunch parent is still behind the game.
+    auto rc = serviceDispatch(&c.functions, 10);
+    u8 focus = 0;
+    const auto deadline = now() + 2000;
+    while (R_SUCCEEDED(rc) && now() < deadline) {
+        rc = serviceDispatchOut(&c.common, 9, focus);
+        if (R_FAILED(rc) || focus == AppletFocusState_InFocus) break;
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+    }
+    if (R_SUCCEEDED(rc) && focus != AppletFocusState_InFocus) rc = KERNELRESULT(TimedOut);
+    startup(69, rc, focus);
+    if (R_FAILED(rc) || !ticket_file(ticket)) return R_FAILED(rc) ? rc : NotReady;
+    rc = register_loader();
     if (R_FAILED(rc)) return rc;
     // Breeze needs a normal foreground initialization on the tested firmware.
     // Resume the game only after its authenticated 6801 state is available.

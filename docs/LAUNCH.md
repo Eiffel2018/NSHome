@@ -3,7 +3,8 @@
 This is a development candidate, not a published release. The first device
 revision failed during duplicate user-parameter injection; that injection has
 been removed. Native user selection and game launch have passed a bounded device test.
-The revised Breeze initialization and return await device acceptance. Stock qlaunch remains installed and owns applications.
+The revised Breeze initialization and return await device acceptance. Full
+automatic Breeze readiness and HOME switching have not passed acceptance. Stock qlaunch remains installed and owns applications.
 
 ## Origin and behavior
 
