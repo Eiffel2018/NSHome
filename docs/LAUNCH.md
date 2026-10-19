@@ -149,7 +149,12 @@ failed before replacing the current NRO. No save was loaded. An earlier candidat
 hit a receipt-file open failure; the loader now bounds retries of that metadata
 open before writing, without retrying the NRO launch itself.
 
-Release gate still open: a later HOME return after background idle timed out
-waiting for EnterNormal and disarmed the pair. The source now grants foreground
-before EnterNormal, but that recovery ordering still needs a device check.
-Version 0.1.9 has not been published.
+The final module (`dedbb24`, SHA256
+`5a871e431442c2239d5d82d432f0fe570b3043618e6069b8718b16564337a530`)
+passed cold PC game start and five successive HOME transitions, then a return
+after background idle, retaining the same game and Breeze processes. Captures
+confirmed both foregrounds; no debugger, BP or watch was active. Direct Return to
+HOME and reopening Breeze retained the same game. The earlier EnterNormal timeout
+is addressed by granting foreground before waiting for normal-render acknowledgement.
+This is bounded validation on the stated console, not a sleep/wake or general
+game compatibility claim.
