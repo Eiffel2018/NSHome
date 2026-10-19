@@ -61,6 +61,8 @@ alone does not restore that setting. Other boot screen layouts are unverified.
 Only bounded main-menu tests have passed: background BP, 16 instruction steps,
 continue, HOME round trips, cold launch and retained-Breeze relaunch. Long-running
 traces, sleep/wake, other game applets and general exit/chainload need more testing.
+An uninterrupted step-into endurance probe returned UI busy after 529 instructions;
+unrestricted long traces have not passed. See [the observed failure](LAUNCH.md).
 The existing 6801 Stop game command can display Nintendo's software-closed dialog.
 Never replay an input or launch whose outcome is unknown.
 

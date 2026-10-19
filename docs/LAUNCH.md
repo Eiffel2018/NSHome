@@ -13,6 +13,14 @@ HOME transitions retained the same game and Breeze processes. A new PC start
 from the retained Breeze also passed in about 4.5 seconds. No save was loaded.
 This verifies bounded stepping, not long-running unattended tracing.
 
+A later uninterrupted step-into endurance probe stopped progressing after 529
+successful instructions (about 53 seconds): the next 6801 request returned UI
+busy. The last observed PC was main+0x7F5748, in an exclusive-load/compare
+sequence. This identifies where the failure occurred, not its cause. Breeze
+subsequently answered again; no game/module crash was observed, and debugger
+ownership and instructions were cleaned up. Unrestricted long step-into traces
+have therefore not passed. Repeated short capture and sleep/wake tests are separate.
+
 The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
 foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
