@@ -24,6 +24,8 @@ const void* qsession{};
 std::uint32_t library{}, application{}, functions{};
 std::uint64_t library_start{}, library_created{};
 bool game_front{};
+std::uint64_t background_generation{}, toggle_sequence{};
+bool toggle_pending{}, toggle_taken{};
 
 Root* find(std::uint64_t generation) {
     for (auto& r : roots) if (r.generation == generation) return &r;
@@ -40,6 +42,14 @@ bool valid() {
     const auto* q = find(qgeneration);
     return armed_generation && b && q && !b->forward.expired() && !q->forward.expired()
         && library && application && functions && library_start && b->tick >= library_created;
+}
+Toggle pair() {
+    return {qgeneration, armed_generation, toggle_sequence, library, application, functions, game_front};
+}
+bool same(const Toggle& t) {
+    return valid() && background_generation == armed_generation && t.qlaunch == qgeneration &&
+        t.album == armed_generation && t.sequence == toggle_sequence && t.library == library &&
+        t.application == application && t.functions == functions && t.game_front == game_front;
 }
 struct PreserveTls {
     std::array<std::uint8_t, 0x100> bytes;
@@ -105,6 +115,10 @@ void observe(const void* session, Kind kind, const Request& request, const Reply
 bool consume_home(const void* session) {
     std::scoped_lock lock(mutex);
     if (session != qsession || !valid()) { armed_generation = 0; return false; }
+    if (background_generation == armed_generation) {
+        if (!toggle_pending) { ++toggle_sequence; toggle_pending = true; toggle_taken = false; }
+        return true; // Reply first; the worker then waits for the applet's Ack.
+    }
     auto root = find(qgeneration)->forward.lock();
     if (!root || !serviceIsDomain(root.get())) { armed_generation = 0; return false; }
     // Extra IPC uses only the relay thread, after its original response is
@@ -132,7 +146,7 @@ bool consume_home(const void* session) {
 std::string command(std::string_view line) {
     std::scoped_lock lock(mutex);
     if (!valid()) armed_generation = 0;
-    if (line == "home off") { armed_generation = 0; return "OK home disabled\n"; }
+    if (line == "home off") { armed_generation = 0; toggle_pending = toggle_taken = false; ++toggle_sequence; return "OK home disabled\n"; }
     if (line.substr(0, 9) == "home arm ") {
         const auto value = line.substr(9);
         std::uint64_t generation = 0;
@@ -159,13 +173,39 @@ void adopt_library(std::uint32_t object, std::uint64_t tick) {
     std::scoped_lock lock(mutex);
     library = object; library_created = library_start = tick; armed_generation = 0;
 }
-bool identify_breeze(std::uint64_t generation, bool game_in_front) {
+bool identify_breeze(std::uint64_t generation, bool game_in_front, bool background) {
     std::scoped_lock lock(mutex);
     const auto* b = album();
     if (!b || b->generation != generation) return false;
     armed_generation = generation;
     if (!valid()) { armed_generation = 0; return false; }
     game_front = game_in_front;
+    background_generation = background ? generation : 0;
+    toggle_pending = toggle_taken = false; ++toggle_sequence;
     return true;
+}
+bool background_pair(Toggle& out) {
+    std::scoped_lock lock(mutex);
+    if (!valid() || background_generation != armed_generation) return false;
+    out = pair(); return true;
+}
+bool take_toggle(Toggle& out) {
+    std::scoped_lock lock(mutex);
+    if (!valid() || background_generation != armed_generation || !toggle_pending || toggle_taken) return false;
+    out = pair(); toggle_taken = true; return true;
+}
+bool matches(const Toggle& value) { std::scoped_lock lock(mutex); return same(value); }
+void finish_toggle(const Toggle& value, bool success) {
+    std::scoped_lock lock(mutex);
+    if (!same(value)) return;
+    if (success) game_front = !game_front;
+    else armed_generation = 0; // Do not replay an uncertain transition.
+    toggle_pending = toggle_taken = false; ++toggle_sequence;
+}
+void request_foreground() {
+    std::scoped_lock lock(mutex);
+    if (valid() && background_generation == armed_generation && game_front && !toggle_pending) {
+        ++toggle_sequence; toggle_pending = true; toggle_taken = false;
+    }
 }
 }

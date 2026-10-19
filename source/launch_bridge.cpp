@@ -4,6 +4,7 @@
 #include "launch_policy.hpp"
 #include "launch_handoff.hpp"
 #include "launch_storage.hpp"
+#include "breeze_background.hpp"
 #include "launch_ecs.hpp"
 #include "loader_receipt.h"
 #include "home_bridge.hpp"
@@ -87,6 +88,84 @@ Result complete(Service* service, bool& out) {
     u8 value = 1;
     const auto rc = serviceDispatchOut(service, 1, value);
     out = value != 0; return rc;
+}
+bool background_capable() {
+    char value[64]{};
+    FILE* file = std::fopen("sdmc:/config/SwitchU/breeze_running", "rb");
+    if (!file) return false;
+    const auto count = std::fread(value, 1, sizeof(value), file);
+    std::fclose(file);
+    return background::capable(value, count);
+}
+Result pop_background(Service& holder, background::Message& message) {
+    Service storage{}, accessor{};
+    auto rc = child(&holder, 103, &storage); // PopInteractiveOutData
+    if (R_SUCCEEDED(rc)) rc = child(&storage, 0, &accessor);
+    s64 size = 0;
+    if (R_SUCCEEDED(rc)) rc = serviceDispatchOut(&accessor, 0, size);
+    if (R_SUCCEEDED(rc) && size != sizeof(message)) rc = NotReady;
+    const s64 offset = 0;
+    if (R_SUCCEEDED(rc)) rc = serviceDispatchIn(&accessor, 11, offset,
+        .buffer_attrs = { SfBufferAttr_HipcAutoSelect | SfBufferAttr_Out }, .buffers = { { &message, sizeof(message) } });
+    if (serviceIsActive(&accessor)) serviceClose(&accessor);
+    if (serviceIsActive(&storage)) serviceClose(&storage);
+    return rc;
+}
+bool background_current(const Connection& c, std::uint64_t generation) {
+    std::scoped_lock lock(mutex);
+    const auto* a = latest_album();
+    return qepoch == c.epoch && a && a->generation == generation && proven == generation;
+}
+Result send_background(Connection& c, Service& holder, std::uint64_t generation,
+                       background::Command command, const home::Toggle* toggle = nullptr) {
+    if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return Cancelled;
+    const background::Message message{background::Magic, command, 0, 0};
+    auto rc = push_storage(&c.creator, &holder, 102, &message, sizeof(message));
+    if (R_FAILED(rc)) return rc;
+    const auto deadline = now() + 1500;
+    while (now() < deadline) {
+        if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return Cancelled;
+        background::Message reply{};
+        if (R_SUCCEEDED(pop_background(holder, reply))) {
+            if (background::ack(reply, command)) return 0;
+            if (background::valid(reply) && reply.command == background::RequestForeground) home::request_foreground();
+        }
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(10));
+    }
+    return KERNELRESULT(TimedOut); // One submission only, including lost Ack.
+}
+void background_tick(Connection& c, Service& holder, std::uint64_t generation) {
+    home::Toggle value;
+    if (!generation || !serviceIsActive(&holder) || !background_current(c, generation) ||
+        !home::background_pair(value) || value.album != generation) return;
+    // Drain only our identified holder, bounded even if Breeze floods the pipe.
+    for (unsigned i=0; i<8; ++i) {
+        background::Message reply{};
+        if (R_FAILED(pop_background(holder, reply))) break;
+        if (background::valid(reply) && reply.command == background::RequestForeground) home::request_foreground();
+    }
+    if (!home::take_toggle(value)) return;
+    auto rc = send_background(c, holder, generation,
+        value.game_front ? background::EnterNormal : background::EnterHidden, &value);
+    if (R_SUCCEEDED(rc) && !home::matches(value)) rc = Cancelled;
+    if (R_SUCCEEDED(rc)) {
+        bool library_done = true, game_done = true;
+        auto game = borrowed(c.connection, value.application);
+        rc = complete(&holder, library_done);
+        if (R_SUCCEEDED(rc)) rc = complete(&game, game_done);
+        if (R_SUCCEEDED(rc) && (library_done || game_done)) rc = NotReady;
+        if (R_SUCCEEDED(rc) && value.game_front) rc = serviceDispatch(&c.functions, 10);
+        else if (R_SUCCEEDED(rc)) {
+            rc = serviceDispatch(&c.functions, 12);
+            if (R_SUCCEEDED(rc)) rc = serviceDispatch(&game, 101);
+        }
+    }
+    startup(81, rc, value.game_front ? 4 : 1);
+    // A failed hide leaves the native applet in front: restore its normal
+    // renderer once, then disarm. Never replay the foreground operation.
+    if (R_FAILED(rc) && !value.game_front && background_current(c,generation))
+        (void)send_background(c,holder,generation,background::EnterNormal);
+    home::finish_toggle(value, R_SUCCEEDED(rc));
 }
 Result first_account(User& out) {
     auto rc = accountInitialize(AccountServiceType_System);
@@ -236,6 +315,7 @@ void worker(void*) {
     for (;;) {
         auto time = now();
         const auto connected = connection.open();
+        if (R_SUCCEEDED(connected)) background_tick(connection, holder, holder_generation);
         nshome::remote::Request request;
         if (nshome::remote::take(request)) {
             Result rc = request.kind == nshome::remote::RequestKind::StartGame ? connected : NotReady;
@@ -295,13 +375,22 @@ void worker(void*) {
                   if (a && a->pid == value.pid && a->generation == proven) generation = a->generation; }
                 if (generation) {
                     auto game = borrowed(connection.connection, state.application);
-                    auto rc = serviceDispatch(&connection.functions, 12);
+                    const bool background = background_capable();
+                    auto rc = background ? send_background(connection, holder, generation, background::EnterHidden) : 0;
+                    startup(80, rc, background);
+                    { std::scoped_lock lock(mutex);
+                      if (policy.phase != Phase::Restoring || policy.epoch != connection.epoch) rc = Cancelled; }
+                    if (R_SUCCEEDED(rc)) rc = serviceDispatch(&connection.functions, 12);
                     if (R_SUCCEEDED(rc)) rc = serviceDispatch(&game, 101);
                     startup(74, rc);
-                    if (R_SUCCEEDED(rc) && home::identify_breeze(generation, true)) {
+                    if (R_SUCCEEDED(rc) && home::identify_breeze(generation, true, background)) {
                         holder_generation = generation;
                         std::scoped_lock lock(mutex); policy.ready(connection.epoch, generation, true);
                         startup(65, 0, static_cast<std::uint32_t>(generation));
+                    } else if (R_FAILED(rc)) {
+                        if (background && background_current(connection,generation))
+                            (void)send_background(connection,holder,generation,background::EnterNormal);
+                        std::scoped_lock lock(mutex); policy.fail(rc);
                     }
                 }
             }

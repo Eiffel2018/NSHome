@@ -10,6 +10,10 @@ Dependencies / provenance:
   The launch first-account policy and delayed Breeze return are adapted from
   projects/daemon/src/{main.cpp,app_manager.cpp,breeze_launch_handoff.hpp}.
   launch_ecs.cpp adapts ecs.cpp without reinitializing the AMS runtime.
+  The BZOV background-render handshake follows main.cpp and the 16-byte
+  BreezeOverlayMessage ABI in projects/common/include/switchu/smi_protocol.hpp.
+  It is restricted to an authenticated, owned Breeze holder; no SwitchU
+  replacement or Breeze binary modification is bundled.
   Stock qlaunch keeps application ownership; its original replacement daemon
   is not embedded here. Bounded launch checks and remaining limits are documented in docs/LAUNCH.md.
 - Atmosphere-NX/Atmosphere-libs aae2da0155a490abd3bfd17a70ccd16bb73c916a,

@@ -17,5 +17,16 @@ std::string command(std::string_view line);
 // Owned background Album accessor in the same cloned qlaunch domain.
 void adopt_library(std::uint32_t object, std::uint64_t started_tick);
 // Only the scoped loader receipt or authenticated identity check may call this.
-bool identify_breeze(std::uint64_t generation, bool game_in_front);
+bool identify_breeze(std::uint64_t generation, bool game_in_front, bool background = false);
+struct Toggle {
+    std::uint64_t qlaunch{}, album{}, sequence{};
+    std::uint32_t library{}, application{}, functions{};
+    bool game_front{};
+};
+// Worker-only handshakes must never wait for Breeze on the AM relay thread.
+bool take_toggle(Toggle& out);
+bool background_pair(Toggle& out);
+bool matches(const Toggle& value);
+void finish_toggle(const Toggle& value, bool success);
+void request_foreground();
 }

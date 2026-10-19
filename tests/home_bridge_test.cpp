@@ -69,6 +69,40 @@ int main() {
     calls.clear();
     assert(home::consume_home(&session));
     assert((calls == std::vector<std::pair<unsigned,unsigned>>{{80,1},{40,1},{10,10}}));
+    assert(home::identify_breeze(4, true, true));
+    calls.clear();
+    assert(home::consume_home(&session));
+    assert(calls.empty()); // Relay must return before waiting for Breeze's IPC.
+    home::Toggle toggle, duplicate;
+    assert(home::take_toggle(toggle));
+    assert(toggle.game_front && toggle.album == 4 && toggle.library == 80);
+    assert(home::consume_home(&session)); // Coalesce, do not submit twice.
+    assert(!home::take_toggle(duplicate));
+    assert(home::matches(toggle));
+    home::finish_toggle(toggle,true);
+    assert(!home::matches(toggle));
+    assert(home::background_pair(duplicate) && !duplicate.game_front);
+    home::request_foreground(); // Already in applet foreground: no new request.
+    assert(!home::take_toggle(duplicate));
+    assert(home::consume_home(&session));
+    assert(home::take_toggle(duplicate) && !duplicate.game_front);
+    home::finish_toggle(duplicate,true);
+    home::request_foreground(); // Breeze requests a native keyboard/normal UI.
+    assert(home::take_toggle(toggle) && toggle.game_front);
+    home::command("home off");
+    assert(!home::matches(toggle));
+    home::finish_toggle(toggle,true);
+    assert(home::command("home status").find("armed=0") != std::string::npos);
+    assert(home::identify_breeze(4,true,true));
+    assert(home::consume_home(&session));
+    assert(home::take_toggle(toggle));
+    home::finish_toggle(toggle,false); // Unknown Ack must not replay HOME.
+    assert(!home::take_toggle(toggle));
+    assert(!home::consume_home(&session));
+    assert(home::identify_breeze(4,true,true));
+    assert(home::consume_home(&session));
+    assert(home::take_toggle(toggle));
     restored.reset();
+    assert(!home::matches(toggle)); // Holder exit invalidates an in-flight Ack.
     assert(!home::consume_home(&session));
 }

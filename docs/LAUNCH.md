@@ -10,6 +10,17 @@ Background debugging is not accepted. Hidden Breeze `state` and `dbg` requests
 returned UI busy; they recovered when that same process returned to the foreground.
 No background breakpoint or continuous-trace claim follows from the launch check.
 
+The background-render candidate additionally uses Breeze's existing BZOV
+interactive-storage protocol (`overlay1` capability). Before giving the game
+foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
+Ack. This stops Breeze rendering to the hidden applet window, which otherwise
+blocks its UI/debug loop. HOME back to the normal applet first uses EnterNormal.
+Acknowledgements are handled by the launch worker after the AM relay responds,
+without holding relay locks. Session changes invalidate pending transitions;
+missing Acks disarm the pair without replaying a foreground request. These
+changes require device validation before release. The optional capability is
+read only after the owned loader and authenticated Breeze identity are proven.
+
 ## Origin and behavior
 
 Only an authenticated TCP6802 `gamestart TITLE_ID` creates an automatic-launch
