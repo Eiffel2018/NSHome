@@ -1,9 +1,10 @@
 # PC game launch candidate (0.1.8)
 
 This is a development candidate, not a published release. Stock qlaunch remains
-installed and owns applications. Source `1e82420` passed a bounded device check:
+installed and owns applications. Source `43c5a28` passed bounded device checks:
 automatic user selection, game launch, authenticated Breeze initialization,
-return to the game and HOME round trips to the same Breeze process.
+return to the game and HOME round trips to the same Breeze process, including
+a second PC start while the previous game's retained Breeze was foreground.
 
 Background debugging is not accepted. Hidden Breeze `state` and `dbg` requests
 returned UI busy; they recovered when that same process returned to the foreground.
@@ -35,11 +36,14 @@ request without showing a selector in the bounded device check.
 
 ## Launch from an occupied Breeze slot
 
-The verified device launch began at stock HOME without an existing NRO. A later
-start from a retained Breeze reached qlaunch's application accessor but never
-reached Start; NSHome's tracker expired. This is not evidence of a game crash.
+Before the handoff fix, a start from retained Breeze reached qlaunch's application
+accessor but never reached Start; NSHome's tracker expired. Source `43c5a28`
+passed this case on device: after stopping the first game and dismissing the
+native closure dialog, one 6802 request from retained Breeze completed in about
+4.4 seconds. Logs confirmed stages 79/76, 77, 61, native Start, authenticated
+new Breeze generation and return to the game. Cold HOME launch also passed.
 
-The new preflight is offline-tested only. With no game running, an identified
+With no game running, an identified
 Breeze gets one normal HOME handoff. For NSHome's own matching holder, NSHome
 also requests a normal exit; it never forces termination. It waits up to five
 seconds for the Album session/library slot to close and qlaunch to regain focus
