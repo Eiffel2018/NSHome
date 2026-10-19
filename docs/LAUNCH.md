@@ -30,8 +30,10 @@ A third probe resolved three late step replies by reading debugger state without
 replaying the step. It reached 4,477 steps (about 508 seconds), then lost both
 6801 and 6802 connectivity. Neutral virtual-stick input had been used to keep
 the console active. The final observed debugger state was stopped with no BPs;
-cleanup could not be confirmed after disconnection. This probe also failed the
-ten-minute target. Most steps stayed in an atomic-operation loop, so it does
+cleanup could not initially be confirmed after disconnection. The operator then
+confirmed the console had slept. After wake, the same processes remained; the
+debugger was detached with no BP/watch/stop, original bytes matched, and a HOME
+round trip passed. This probe still failed the ten-minute target. Most steps stayed in an atomic-operation loop, so it does
 not establish broad game-code coverage.
 
 An actual sleep/wake cycle showed network loss and recovery, but the console
