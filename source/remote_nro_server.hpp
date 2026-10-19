@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Adapted from Eiffel2018/SwitchU 546903f6 (see NOTICE.md).
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+namespace nshome::remote {
+
+constexpr const char* kRemoteChannelVersionMarker = "remote channel v6";
+
+enum class RequestKind { Nro, StartGame };
+
+struct Request {
+    std::uint64_t id = 0;
+    std::string path;
+    RequestKind kind = RequestKind::Nro;
+    std::uint64_t titleId = 0;
+};
+
+// Starts the authenticated BreezePC listener. Returns false when disabled,
+// misconfigured, or unable to create the service thread. The service retries
+// socket setup in the background when the network is temporarily unavailable.
+bool start(void (*wake)());
+void stop();
+// Nonblocking AM wake notification; the worker owns descriptor/BSD teardown.
+void notifyWake();
+
+// take() transfers the queued request and changes its state to "launching".
+bool take(Request& request);
+bool hasPending();
+bool busy();
+
+// "started" permits a later explicit replacement; queued/launching stay busy.
+// A stale request's completion cannot overwrite a newer request's receipt.
+void finish(std::uint64_t id, const char* state, std::uint32_t rc = 0);
+
+} // namespace nshome::remote
