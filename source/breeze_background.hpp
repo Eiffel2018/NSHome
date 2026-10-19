@@ -6,6 +6,9 @@
 namespace observer::background {
 // Existing SwitchU/Breeze BZOV interactive-storage ABI; no Breeze binary patch.
 constexpr std::uint32_t Magic = 0x564f5a42;
+// Cold UI frames can exceed 1.5 s during game loading. Only the launch worker
+// waits; the AM relay returns immediately and no command is replayed.
+constexpr std::uint64_t AckTimeoutMs = 5000;
 enum Command : std::uint32_t { EnterHidden=1, Show=2, Hide=3, EnterNormal=4, Release=5, Ack=0x81, RequestForeground=0x82, StateChanged=0x83 };
 struct Message {
     std::uint32_t magic{Magic}, command{}, argument{}, reserved{};

@@ -110,19 +110,31 @@ Result send_background(Connection& c, Service& holder, std::uint64_t generation,
                        background::Command command, const home::Toggle* toggle = nullptr) {
     if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return Cancelled;
     const background::Message message{background::Magic, command, 0, 0};
+    const auto started = now();
+    const auto result = [&](Result value) {
+        Record record;
+        record.kind = Kind::Library;
+        record.object = holder.object_id;
+        record.command = command;
+        record.argument = static_cast<std::uint32_t>(now() - started);
+        record.result = value;
+        record.flags = 0x1000;
+        push(record);
+        return value;
+    };
     auto rc = background::send_message(c.creator, holder, message);
-    if (R_FAILED(rc)) return rc;
-    const auto deadline = now() + 1500;
+    if (R_FAILED(rc)) return result(rc);
+    const auto deadline = started + background::AckTimeoutMs;
     while (now() < deadline) {
-        if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return Cancelled;
+        if (!background_current(c, generation) || (toggle && !home::matches(*toggle))) return result(Cancelled);
         background::Message reply{};
         if (R_SUCCEEDED(pop_background(holder, reply))) {
-            if (background::ack(reply, command)) return 0;
+            if (background::ack(reply, command)) return result(0);
             if (background::valid(reply) && reply.command == background::RequestForeground) home::request_foreground();
         }
         ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(10));
     }
-    return KERNELRESULT(TimedOut); // One submission only, including lost Ack.
+    return result(KERNELRESULT(TimedOut)); // One submission only, including lost Ack.
 }
 void background_tick(Connection& c, Service& holder, std::uint64_t generation) {
     home::Toggle value;
