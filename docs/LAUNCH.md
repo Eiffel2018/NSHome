@@ -26,6 +26,19 @@ A separate repeated-capture endurance probe also returned UI busy after 102
 This probe did not traverse the earlier exclusive sequence. Both modes recovered,
 but neither completed the requested ten minutes; the failure cause is unresolved.
 
+A third probe resolved three late step replies by reading debugger state without
+replaying the step. It reached 4,477 steps (about 508 seconds), then lost both
+6801 and 6802 connectivity. Neutral virtual-stick input had been used to keep
+the console active. The final observed debugger state was stopped with no BPs;
+cleanup could not be confirmed after disconnection. This probe also failed the
+ten-minute target. Most steps stayed in an atomic-operation loop, so it does
+not establish broad game-code coverage.
+
+An actual sleep/wake cycle showed network loss and recovery, but the console
+soon slept again. With keep-active input after a further wake, HOME round trips
+retained the same game/Breeze processes and a background BP hit. Autonomous
+sleep/wake stability remains unverified.
+
 The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
 foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
