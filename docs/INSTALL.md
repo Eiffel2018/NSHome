@@ -56,6 +56,13 @@ it, remove `config/NSHome/boot-touch-once.flag`. Remove `skip-lock-screen.flag`
 too and restore the lock setting in System Settings if desired; removing flags
 alone does not restore that setting. Other boot screen layouts are unverified.
 
+## Returning to stock HOME
+
+Known issue: after leaving the owned Breeze for hbmenu, HOME and `+` may fail
+to return to qlaunch. `home off` only disables HOME interception; it does not
+close the retained applet. If trapped, reboot and change system settings before
+starting another PC game session. A reliable return-to-qlaunch path is pending.
+
 ## Limits and removal
 
 Only bounded main-menu tests have passed: background BP, 16 instruction steps,

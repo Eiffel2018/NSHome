@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Disable experimental HOME switching; keep the sysmodule running."""
+"""Disable HOME interception; keep the module and current applet running.
+
+This does not close the retained applet or guarantee a return to stock HOME.
+"""
 from _common import parser, run, ranged, BUTTONS, STACKS, buttons, nro_path, Path
 
 
