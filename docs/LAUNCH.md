@@ -21,6 +21,11 @@ subsequently answered again; no game/module crash was observed, and debugger
 ownership and instructions were cleaned up. Unrestricted long step-into traces
 have therefore not passed. Repeated short capture and sleep/wake tests are separate.
 
+A separate repeated-capture endurance probe also returned UI busy after 102
+16-instruction captures (1,632 steps, about 262 seconds), during the next capture.
+This probe did not traverse the earlier exclusive sequence. Both modes recovered,
+but neither completed the requested ten minutes; the failure cause is unresolved.
+
 The background-render bridge uses Breeze's existing BZOV
 interactive-storage protocol (`overlay1` capability). Before giving the game
 foreground, it sends EnterHidden and waits at most 1.5 seconds for its matching
