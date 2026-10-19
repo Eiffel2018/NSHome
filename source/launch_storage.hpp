@@ -16,7 +16,10 @@ inline Result push_storage(Service* creator, Service* destination, std::uint32_t
     if (R_SUCCEEDED(rc)) rc = child(&storage, 0, &accessor);
     const s64 offset = 0;
     if (R_SUCCEEDED(rc)) rc = serviceDispatchIn(&accessor, 10, offset,
-        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In }, .buffers = { {data, size} });
+        // IStorageAccessor::Write uses an auto-select buffer (libnx's
+        // _appletStorageAccessorRW), including its pointer descriptor. A plain
+        // map-alias buffer is a malformed request and closes the AM session.
+        .buffer_attrs = { SfBufferAttr_HipcAutoSelect | SfBufferAttr_In }, .buffers = { {data, size} });
     if (serviceIsActive(&accessor)) serviceClose(&accessor);
     if (R_SUCCEEDED(rc)) rc = serviceDispatch(destination, command, .in_num_objects = 1, .in_objects = { &storage });
     if (serviceIsActive(&storage)) serviceClose(&storage);

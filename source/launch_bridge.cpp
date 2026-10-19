@@ -136,12 +136,15 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
     if (R_FAILED(rc)) return rc;
     const struct { u32 id, mode; } input{AppletId_LibraryAppletPhotoViewer, LibAppletMode_Background};
     rc = serviceDispatchIn(&c.creator, 0, input, .out_num_objects = 1, .out_objects = &holder);
+    startup(70, rc);
     LibAppletArgs args{};
     args.CommonArgs_version = 1; args.CommonArgs_size = sizeof(args);
     args.LaVersion = 0x10000; args.tick = armGetSystemTick();
     if (R_SUCCEEDED(rc)) rc = push_storage(&c.creator, &holder, 100, &args, sizeof(args));
+    startup(71, rc);
     const u8 album = AlbumLaArg_ShowAllAlbumFilesForHomeMenu;
     if (R_SUCCEEDED(rc)) rc = push_storage(&c.creator, &holder, 100, &album, sizeof(album));
+    startup(72, rc);
     if (R_SUCCEEDED(rc)) {
         std::scoped_lock lock(mutex);
         if (policy.phase != Phase::Restoring || policy.epoch != c.epoch || qepoch != c.epoch) rc = Cancelled;
@@ -150,6 +153,7 @@ Result open_breeze(Connection& c, Service& holder, std::uint64_t ticket) {
         // Publish before Start: the NRO may initialize AM before it returns.
         home::adopt_library(holder.object_id, armGetSystemTick());
         rc = serviceDispatch(&holder, 10);
+        startup(73, rc);
     }
     if (R_FAILED(rc)) {
         if (serviceIsActive(&holder)) serviceClose(&holder);

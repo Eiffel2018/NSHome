@@ -15,6 +15,8 @@ build/tests/home_bridge
 
 g++ "${flags[@]}" -Isource tests/launch_policy_test.cpp -o build/tests/launch_policy
 build/tests/launch_policy
+g++ "${flags[@]}" -Itests/launch_storage_stub -Isource tests/launch_storage_test.cpp -o build/tests/launch_storage
+build/tests/launch_storage
 g++ "${flags[@]}" -Isource tests/codec_test.cpp -o build/tests/codec
 build/tests/codec
 for component in protocol input touch capture; do
