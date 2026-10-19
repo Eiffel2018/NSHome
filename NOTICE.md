@@ -11,7 +11,7 @@ Dependencies / provenance:
   projects/daemon/src/{main.cpp,app_manager.cpp,breeze_launch_handoff.hpp}.
   launch_ecs.cpp adapts ecs.cpp without reinitializing the AMS runtime.
   Stock qlaunch keeps application ownership; its original replacement daemon
-  is not embedded here. The new launch integration is not hardware verified.
+  is not embedded here. Bounded launch checks and remaining limits are documented in docs/LAUNCH.md.
 - Atmosphere-NX/Atmosphere-libs aae2da0155a490abd3bfd17a70ccd16bb73c916a,
   GPL-2.0: IPC MITM server, original forwarding, domain and PID handling.
   No dependency source files are modified. The diagnostic uses a link wrapper

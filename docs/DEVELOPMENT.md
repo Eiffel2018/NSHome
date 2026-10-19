@@ -6,6 +6,10 @@ Run `bash tests/run.sh`, then `bash build.sh` with `AMS_LIBRARIES` and
 `DEVKITPRO` set. Dependency revisions are pinned in the root README.
 Package with `python3 package.py /absolute/path/to/NSHome.zip`.
 The build checks executable/container formats, module ID, forwarding and allocation.
+All newlib reentrant allocation entry points, including `_memalign_r` used by
+stdio aligned buffers, must route to Stratosphere. The default newlib memalign
+implementation edits malloc chunk metadata and cannot use Stratosphere pointers;
+`verify.py` checks the linked allocation routes.
 
 ## Installation
 
@@ -26,8 +30,8 @@ Original Nintendo qlaunch remains in use.
 
 TCP6802 uses `switch/Breeze/config.ini`, section `[PC connect]`.
 Controls, touch, capture and diagnostics work independently of Breeze6801.
-The 0.1.8 offline candidate adds PC6802 game launch; generic NRO launch still
-returns `launch-bridge-unavailable`. The installed 0.1.7 build rejects both.
+The 0.1.8 development candidate adds PC6802 game launch; generic NRO launch still
+returns `launch-bridge-unavailable`. Version 0.1.7 rejects both.
 The matched Breeze loader pair above is required for automatic return.
 See [launch behavior, origin rules and pending checks](LAUNCH.md).
 Use bounded input pulses, disable the input gate afterwards, and never replay

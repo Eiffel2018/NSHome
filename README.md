@@ -2,24 +2,27 @@
 
 An independent Nintendo Switch system module for retaining original qlaunch
 while switching HOME between a running game and a resident Breeze NRO.
-Experimental version: **0.1.8 development candidate** (not released; automatic Breeze return is not accepted).
-Previous device evidence belongs to **0.1.7**. This is a standalone repository, with
+Experimental version: **0.1.8 development candidate** (not released; background debugging is not accepted).
+Bounded game-launch and HOME-switching checks passed on one test console. This is a standalone repository, with
 no hbmenu UI, assets or inherited Git history.
 
 ## Current behavior
 
 - Original qlaunch remains installed; module Program ID: `00FF4E5348414D01`.
 - Authenticated TCP 6802 provides controls, touch, capture and diagnostics.
-- The offline candidate adds PC6802 game launch with automatic first-user
+- The development candidate adds PC6802 game launch with automatic first-user
   selection, delayed Breeze return and HOME arming. Manual/6801 starts retain
   their original behavior. See [the launch implementation and pending checks](docs/LAUNCH.md).
 - One automatic cold-boot touch unlock passed device verification.
-- Manually armed HOME switching retained the same Breeze session; a background
-  breakpoint hit and a pending single step were verified on the test console.
+- Automatic PC6802 launch selected a user, restored Breeze, resumed the game,
+  and retained the same Breeze process across HOME round trips.
+- Earlier 0.1.7 manually armed tests included a background breakpoint hit and
+  pending single step; those results do not validate the new automatic flow.
 
-This is not a finished HOME replacement. The new launch/automatic arming flow,
-continuous trace and general exit/chainload behavior need hardware validation. Breeze
-UI/debug RPC can return busy while hidden. Stock qlaunch suspends the game while
+This is not a finished HOME replacement. Background debugging, continuous trace,
+manual-launch regression and general exit/chainload behavior still need validation.
+In the tested automatic flow, hidden Breeze `state`/`dbg` RPC returned busy;
+these calls recovered when HOME brought the same Breeze back into focus. Stock qlaunch suspends the game while
 Breeze is in front. Generic 6802 NRO launch remains unsupported.
 
 ## Python examples

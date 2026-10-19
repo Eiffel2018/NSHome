@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (0.1.8 offline candidate), not
+This reference describes the current NSHome source (0.1.8 development candidate), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -59,7 +59,7 @@ authenticated connection for each command.
 | [12_home_arm.py](../samples/12_home_arm.py) | Required `--generation` positive decimal, at most 19 digits | `home arm GENERATION`; experimental, manual identity check required |
 | [13_home_off.py](../samples/13_home_off.py) | None | `home off`; stops HOME interception, module continues running |
 | [14_launch_nro.py](../samples/14_launch_nro.py) | Required `--path` absolute SD .nro path | `launch PATH`; **currently ERR launch-bridge-unavailable** |
-| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow in the 0.1.8 candidate, unverified on hardware |
+| [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow in the 0.1.8 candidate; bounded device check passed, background debugging pending |
 | [16_home_button.py](../samples/16_home_button.py) | `--ms` 1..1000 default 100 | `press HOME MS`; presses HOME, does not enable HOME switching |
 | [17_capture_button.py](../samples/17_capture_button.py) | `--ms` 1..1000 default 100 | `press CAPTURE MS`; console Album workflow, no JPEG response to PC |
 

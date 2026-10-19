@@ -1,10 +1,13 @@
 # PC game launch candidate (0.1.8)
 
-This is a development candidate, not a published release. The first device
-revision failed during duplicate user-parameter injection; that injection has
-been removed. Native user selection and game launch have passed a bounded device test.
-The revised Breeze initialization and return await device acceptance. Full
-automatic Breeze readiness and HOME switching have not passed acceptance. Stock qlaunch remains installed and owns applications.
+This is a development candidate, not a published release. Stock qlaunch remains
+installed and owns applications. Source `1e82420` passed a bounded device check:
+automatic user selection, game launch, authenticated Breeze initialization,
+return to the game and HOME round trips to the same Breeze process.
+
+Background debugging is not accepted. Hidden Breeze `state` and `dbg` requests
+returned UI busy; they recovered when that same process returned to the foreground.
+No background breakpoint or continuous-trace claim follows from the launch check.
 
 ## Origin and behavior
 
@@ -27,8 +30,8 @@ NSHome forwards these application commands unchanged; it does not inject a
 second parameter or replace Start replies.
 
 This adapts the old first-account and delayed-return mechanisms, rather than
-copying its whole qlaunch replacement. Native qlaunch honoring the user-aware
-request without showing a selector is a required device check.
+copying its whole qlaunch replacement. Native qlaunch honored the user-aware
+request without showing a selector in the bounded device check.
 
 ## Breeze return
 
@@ -71,8 +74,8 @@ timing, cancellation, bounded retries and adopted HOME sessions.
 Compilation verifies AArch64 module/loader
 containers and program IDs. These tests do not emulate proprietary qlaunch.
 
-Required device checks include first-user selection with multiple accounts,
-game startup without a selector, Breeze background launch and automatic HOME
-arming, unchanged manual/6801 starts, cancellation and normal exit. General
-background tracing and controller behavior across process boundaries remain
-separate runtime acceptance items.
+The bounded device check used firmware 22.5.0, Breeze beta125.05 and one game
+(0100005027A18000), stopping at its main menu without loading a save. General
+firmware/game compatibility is not established. Remaining checks include multiple
+accounts, unchanged manual/6801 starts, cancellation, normal exit, background
+breakpoints/continuous tracing and controller behavior across process boundaries.
