@@ -30,6 +30,29 @@ idle peers held open, eight status calls passed in 0.16¡V0.17 seconds each;
 combined auth/command framing also passed. This is not general firmware/game,
 sleep/wake or endurance validation. The public 0.1.9 ZIP remains unchanged.
 
+### Breeze beta126 compatibility check
+
+On 2026-10-20, the installed NSHome 0.1.10-dev build was checked with the
+running Breeze beta126.00 NRO. Authenticated 6801 state, game metadata and
+debugger-state reads worked both in the foreground and background. Native
+Album/hbmenu launch automatically paired HOME; four consecutive HOME transitions
+retained the same Breeze process and alternated between the visible game main
+menu and Breeze. 6802 status, input and capture worked; the four status requests
+took approximately 0.16 seconds each. A fresh 6802 Breeze launch also reached
+authenticated beta126.00 readiness.
+
+Exiting the initially native-opened Breeze through hbmenu and HOME reached stock
+qlaunch. After the PC-launched instance exited through hbmenu, the first HOME
+returned to the game and a second HOME reached qlaunch. This extra transition
+remains an observed limitation; its cause has not been diagnosed.
+
+The console did not need a reboot. No save was loaded, existing cheat enable
+states were preserved, the debugger remained detached with no breakpoints, and
+remote input was disabled after testing. This check did not repeat breakpoints,
+trace, sleep/wake, cold console boot, DBI L3 or PC game-start validation. It did
+not install or validate the 0.1.11-dev catalogue candidate, and does not change
+the warning on the published 0.1.9 ZIP.
+
 This experimental release keeps stock qlaunch. It remains
 installed and owns applications. Source `43c5a28` passed bounded device checks:
 automatic user selection, game launch, authenticated Breeze initialization,
