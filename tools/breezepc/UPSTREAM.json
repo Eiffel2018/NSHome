@@ -1,0 +1,17 @@
+{
+  "upstream": "https://github.com/tomvita/Breeze-Beta",
+  "package": "Breeze_v126 supplied by user",
+  "upstream_app_sha256": "e0ea88322940a66196b8bdbbd69664d71695d509e665af670facd3c440198373",
+  "files_sha256": {
+    "breeze_unity.py": "735ebe04eb24c9f1dfcac3ce42ce2f5aab3fd28fe79005569819b2298e0a54c6",
+    "pc_game_history.py": "042e523638223976bb2f33cf03c717ee18ef7042b09f13809ed547e255b81f7c",
+    "pcconnect.py": "d33f92fc465e9a2636545211df24636e22ea3439937186cfc6b0d3ee282bf767",
+    "pcconnect_album.py": "7ce0b4e51bbd39a34912faba7fad4016db99a4aa85501569ecbbb0c50000bf14",
+    "pcconnect_app.py": "5f5c93bc98b0115c81c88837629f5e258190138b23c6c4fc8b054d31a686b848",
+    "pcconnect_asm.py": "f2ca2bf22ec3473a5e918b8d1846944c4a6acc67203d7762ab2367f6bbedc4b8",
+    "pcconnect_decomp.py": "82cd91f2f0d532bc6f8157e27b70f562a539f9fdf15483064b0069b9af554079",
+    "pcconnect_files.py": "f7a009a0dbc6e2fb17874aec68c7263607a3086e1e116cb24c58ec63dfd40afc",
+    "pcconnect_text.py": "4455b24b0045e540ed92c8956a91be542c3f03b9d6fa908ecbbb78e4214bba02",
+    "switchu_remote.py": "db04998d14bdaac576380e569bed9a0776658d7dff1d3ae658e91d3033181b7d"
+  }
+}
