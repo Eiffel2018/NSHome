@@ -109,7 +109,7 @@ struct Backend {
         if (size<sizeof(NacpStruct)) { row.name_result=Invalid; return; }
         NacpLanguageEntry* language=nullptr;
         const bool preferred=R_SUCCEEDED(nacpGetLanguageEntry(&data->nacp,&language)) && language && language->name[0];
-        if (!preferred) for (auto& item : data->nacp.lang) if (item.name[0]) { language=&item; break; }
+        if (!preferred && data->nacp.titles_data_format==0) for (auto& item : data->nacp.lang_data.lang) if (item.name[0]) { language=&item; break; }
         if (!language || !language->name[0]) { row.name_result=Invalid; return; }
         row.name=name_utf8(std::string_view(language->name,strnlen(language->name,sizeof(language->name))));
         row.name_source=preferred ? "nacp.system_language" : "nacp.first_available";
