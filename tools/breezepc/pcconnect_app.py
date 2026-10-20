@@ -1958,35 +1958,9 @@ class App:
             pass
 
     def on_stop_game(self):
-        tid = valid_tid(self.save_tid)
-        if not tid or not self.save or not self.save.get("game_running"):
-            return
-        if self.switchu_busy:
-            self.status.config(text="A NSHome request is pending; no stop was sent.")
-            return
-        if not messagebox.askokcancel("Stop game", "Close the game now?\n\nUnsaved progress may be lost.", parent=self.root):
-            return
-        self.switchu_busy = True
-        self._set_switchu_buttons()
-        self.status.config(text="Closing game through NSHome 6802...")
-        threading.Thread(target=self._switchu_stop_worker,
-                         args=(self.switchu_generation, self.cfg["host"], self.cfg["code"], tid),
-                         daemon=True).start()
-
-    def _switchu_stop_worker(self, generation, host, code, tid):
-        try:
-            receipt = switchu_remote.stop_game(host, code, tid)
-            number = switchu_remote.request_id(receipt)
-            if number is None:
-                raise ValueError("Missing close receipt; outcome unknown")
-            observed = switchu_remote.wait_for_request(host, code, number, deadline=35)
-            accepted = (switchu_remote.request_id(observed) == number
-                        and switchu_remote.status_state(observed) == "finished")
-            message = ("Game closed through the original HOME Menu." if accepted else
-                       "NSHome close request: %s. No stop was resent." % observed)
-        except (switchu_remote.RemoteError, ValueError) as exc:
-            message = "NSHome game close: %s. No stop was resent or sent through 6801." % exc
-        self.out.put(("switchu_stop", generation, message))
+        if messagebox.askokcancel("Stop game", "Stop the game now?\n\nIt ends at once, as if it had crashed: "
+                                  "anything it has not saved is lost.", parent=self.root):
+            self.link.send("gamestop")
 
     def on_start_game(self):
         if self.save and self.save.get("game_running"):
@@ -2296,13 +2270,6 @@ class App:
                         self.last_reply = ""
                 elif item[0] == "status":
                     self.status.config(text=item[1])
-                elif item[0] == "switchu_stop":
-                    _, generation, message = item
-                    if generation == self.switchu_generation:
-                        self.switchu_busy = False
-                        self._set_switchu_buttons()
-                        self.status.config(text=message)
-                        self.link.send("save")
                 elif item[0] == "switchu_game":
                     _, generation, tid, accepted, message = item
                     if generation == self.switchu_generation:
