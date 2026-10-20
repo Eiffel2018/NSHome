@@ -9,6 +9,8 @@
 #include "launch_ecs.hpp"
 #include "loader_receipt.h"
 #include "home_bridge.hpp"
+#include "close_screen.hpp"
+#include "remote_nro_input.hpp"
 #include "remote_nro_server.hpp"
 #include "trace.hpp"
 #include <array>
@@ -471,6 +473,102 @@ bool manual_breeze(Connection& c, home::LibrarySnapshot& snapshot, std::uint64_t
     if (R_FAILED(rc) || focus != AppletFocusState_InFocus || !background_current(c,generation)) return false;
     return home::matches_library(snapshot) && home::identify_breeze(generation,false,background_capable());
 }
+// Native qlaunch owns the close intent and its result presentation. Direct
+// RequestExit/Terminate is insufficient: even Result=0 can show its error UI.
+struct CloseContext { Connection* connection{}; u64 pid{}, title{}; u32 object{}; bool confirm{}; };
+CloseContext* closing{}; // Worker-owned; input callback runs synchronously.
+Result application_pid(u64& pid) {
+    auto rc=pmdmntInitialize();
+    if (R_FAILED(rc)) return rc;
+    rc=pmdmntGetApplicationProcessId(&pid); pmdmntExit(); return rc;
+}
+bool close_identity(const CloseContext& value) {
+    auto& c=*value.connection;
+    std::scoped_lock lock(mutex);
+    if (qepoch!=c.epoch || current_application!=value.object) return false;
+    u64 pid=0,title=0;
+    if (R_FAILED(application_pid(pid)) || pid!=value.pid) return false;
+    auto app=borrowed(c.connection,value.object);
+    return R_SUCCEEDED(serviceDispatchOut(&app,120,title)) && title==value.title;
+}
+bool close_input_allowed() {
+    if (!closing || !close_identity(*closing)) return false;
+    u8 focus=0;
+    if (R_FAILED(serviceDispatchOut(&closing->connection->common,9,focus)) || focus!=AppletFocusState_InFocus) return false;
+    // Rechecked after virtual-controller discovery, immediately before input.
+    return stock_close_screen(closing->confirm) && close_identity(*closing);
+}
+Result stop_game(Connection& c, Service& holder, std::uint64_t& holder_generation,
+                 const nshome::remote::Request& request) {
+    CloseContext context{&c,0,request.titleId,0,false};
+    {
+        std::scoped_lock lock(mutex);
+        if (qepoch!=c.epoch || !current_application || policy.pending()) return NotReady;
+        context.object=current_application;
+        // Do not replace DBI/other NROs to stop a game. Only a proven Breeze.
+        const auto* a=latest_album();
+        if (a && a->generation!=proven) return Busy;
+    }
+    auto rc=application_pid(context.pid);
+    if (R_FAILED(rc) || !context.pid) return R_FAILED(rc) ? rc : NotReady;
+    if (!close_identity(context)) return Cancelled;
+    // Release this console's single Album slot before giving qlaunch input.
+    rc=replace_album(c,holder,holder_generation);
+    if (R_FAILED(rc)) return rc;
+    (void)home::command("home off");
+    { std::scoped_lock lock(mutex); policy={}; }
+    rc=serviceDispatch(&c.functions,10);
+    if (R_FAILED(rc)) return rc;
+    closing=&context;
+    struct Reset { ~Reset() { closing=nullptr; } } reset;
+    const auto wait_screen=[&](u64 timeout) {
+        const auto until=now()+timeout;
+        do {
+            if (!close_identity(context)) return false;
+            if (close_input_allowed()) return true;
+            ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(100));
+        } while (now()<until);
+        return false;
+    };
+    if (!close_input_allowed()) {
+        // Foreground ownership alone does not enter qlaunch's HOME scene.
+        // Deliver one stock HOME message after disarming the old pair.
+        const u32 button=AppletSystemButtonType_HomeButtonShortPressing;
+        rc=serviceDispatchIn(&c.debug,10,button);
+        startup(113,rc);
+        if (R_FAILED(rc)) return rc;
+    }
+    if (!wait_screen(3000)) return NotReady;
+    bool attempted=false;
+    rc=nshome::remote_input::pressButtonIf(HidNpadButton_X,100,close_input_allowed,&attempted);
+    startup(110,rc,attempted);
+    if (R_FAILED(rc) || !attempted) return R_FAILED(rc) ? rc : Cancelled;
+    context.confirm=true;
+    if (!wait_screen(3000)) return NotReady;
+    attempted=false;
+    rc=nshome::remote_input::pressButtonIf(HidNpadButton_A,100,close_input_allowed,&attempted);
+    startup(111,rc,attempted);
+    if (R_FAILED(rc) || !attempted) return R_FAILED(rc) ? rc : Cancelled;
+    const auto deadline=now()+5000;
+    bool exited=false;
+    do {
+        if (!connection_current(c)) return Cancelled;
+        u64 pid=0; rc=application_pid(pid);
+        if (rc==ams::pm::ResultProcessNotFound().GetValue() || (R_SUCCEEDED(rc) && !pid)) { exited=true; break; }
+        if (R_FAILED(rc)) return rc;
+        if (pid!=context.pid) return Cancelled;
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+    } while (now()<deadline);
+    if (!exited) return KERNELRESULT(TimedOut);
+    closing=nullptr;
+    // A human may have opened a new game/NRO while the old game closed.
+    if (no_running_game()!=0) return Cancelled;
+    { std::scoped_lock lock(mutex); if (latest_album()) return Cancelled; }
+    // Restore Breeze for the PC connection, after the native close has ended.
+    nshome::remote::Request restore;
+    restore.path=NSH_BREEZE_PATH;
+    return launch_nro(c,holder,holder_generation,restore);
+}
 void worker(void*) {
     Connection connection;
     Service holder{};
@@ -521,6 +619,12 @@ void worker(void*) {
         }
         nshome::remote::Request request;
         if (nshome::remote::take(request)) {
+            if (request.kind == nshome::remote::RequestKind::StopGame) {
+                const auto rc = R_SUCCEEDED(connected) ? stop_game(connection, holder, holder_generation, request) : connected;
+                startup(112, rc, static_cast<std::uint32_t>(request.id));
+                nshome::remote::finish(request.id, R_SUCCEEDED(rc) ? "finished" : "failed", rc);
+                continue;
+            }
             if (request.kind == nshome::remote::RequestKind::Nro) {
                 const auto rc = R_SUCCEEDED(connected) ? launch_nro(connection, holder, holder_generation, request) : connected;
                 startup(91, rc, static_cast<std::uint32_t>(request.id));

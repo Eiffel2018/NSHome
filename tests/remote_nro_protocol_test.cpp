@@ -18,6 +18,11 @@ int main() {
         assert(parseCommand(bad).kind==CommandKind::Invalid);
     const auto game = parseCommand("gamestart 0100005027a18000");
     assert(game.kind == CommandKind::StartGame && game.titleId == 0x0100005027A18000ULL);
+    const auto stop = parseCommand("gamestop 0100005027A18000");
+    assert(stop.kind == CommandKind::StopGame && stop.titleId == game.titleId);
+    for (const char* bad : {"gamestop", "gamestop ", "gamestop 0000000000000000",
+         "gamestop 0100005027A1800", "gamestop 0x0100005027A18000", "gamestop 0100005027A18000 extra"})
+        assert(parseCommand(bad).kind == CommandKind::Invalid);
     for (const char* bad : {"gamestart 0000000000000000", "gamestart 0100005027A1800",
          "gamestart 0100005027A180000", "gamestart 0x0100005027A18000",
          "gamestart 0100005027A1800Z", "gamestart 0100005027A18000 extra"})

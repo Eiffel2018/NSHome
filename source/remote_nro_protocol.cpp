@@ -63,14 +63,15 @@ Command parseCommand(std::string_view line) {
         if (!out.numbers[0] || !out.numbers[1] || out.numbers[2]>4096 || !out.numbers[3] || out.numbers[3]>16) return {};
         return out;
     }
-    if (line.substr(0, 10) == "gamestart ") {
-        const auto text = line.substr(10);
+    if (line.substr(0, 10) == "gamestart " || line.substr(0, 9) == "gamestop ") {
+        const bool stop = line.substr(0, 9) == "gamestop ";
+        const auto text = line.substr(stop ? 9 : 10);
         std::uint64_t tid = 0;
         const auto parsed = std::from_chars(text.data(), text.data() + text.size(), tid, 16);
         if (text.size() != 16 || parsed.ec != std::errc{} ||
             parsed.ptr != text.data() + text.size() || tid == 0)
             return {};
-        Command command{CommandKind::StartGame, std::string(text)};
+        Command command{stop ? CommandKind::StopGame : CommandKind::StartGame, std::string(text)};
         command.titleId = tid;
         return command;
     }

@@ -8,9 +8,9 @@
 namespace nshome::remote {
 
 constexpr const char* kRemoteChannelVersionMarker = "remote channel v7";
-constexpr const char* kBuildVersion = "0.1.11-dev";
+constexpr const char* kBuildVersion = "0.1.12";
 
-enum class RequestKind { Nro, StartGame };
+enum class RequestKind { Nro, StartGame, StopGame };
 
 struct Request {
     std::uint64_t id = 0;

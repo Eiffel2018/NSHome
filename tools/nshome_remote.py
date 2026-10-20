@@ -300,6 +300,12 @@ class Client:
         """
         return self._exchange('launch ' + nro_path(path))
 
+    def game_stop(self, title_id):
+        """Queue native AM close for this exact TID; track the receipt to finished."""
+        if not isinstance(title_id, str) or not re.fullmatch(r'[0-9a-fA-F]{16}', title_id) or int(title_id, 16) == 0:
+            raise ValueError('Title ID must be exactly 16 nonzero hexadecimal digits')
+        return self._exchange('gamestop ' + title_id)
+
     def game_start(self, title_id):
         """Queue a PC launch. 0.1.8 candidate restores Breeze; status tracks outcome.
 

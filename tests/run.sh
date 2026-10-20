@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/tests
 flags=(-std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -g)
+g++ "${flags[@]}" -Isource tests/stock_close_test.cpp -o build/tests/stock_close
+build/tests/stock_close
+
 g++ "${flags[@]}" -Isource tests/boot_gate_test.cpp -o build/tests/boot_gate
 build/tests/boot_gate
 g++ "${flags[@]}" -Isource tests/boot_jpeg_test.cpp source/boot_jpeg.cpp -o build/tests/boot_jpeg

@@ -19,6 +19,7 @@ enum class CommandKind {
     Status,
     Launch,
     StartGame,
+    StopGame,
     Press,
     Stick,
     Controller,

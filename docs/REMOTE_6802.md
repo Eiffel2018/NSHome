@@ -245,3 +245,17 @@ with open("screen.jpg", "xb") as output:
 
 Offline tests use fake sockets and local files. They verify client framing,
 validation, cleanup and sample coverage; they do not establish new device support.
+
+## Close a running game (0.1.12)
+
+`gamestop TID` requires the exact 16-digit running application ID. It uses stock
+HOME's X/Close flow, with TID, process, focus and screen checks before input.
+Only the observed stock 1280x720 layout is supported; an unknown layout fails
+without a confirmation press. It never uses a raw process kill or falls back
+to 6801. An active NRO other than the identified Breeze is left alone.
+
+Use `client.game_stop(TID)` or [sample 19](../samples/19_stop_game.py). Parameters
+are `--host`, optional `--port` / `--timeout`, and required `--title-id`.
+`OK queued ID` is acceptance only. Poll `status` for the same ID until
+`finished` or `failed`, up to 35 seconds; do not replay an unknown outcome.
+A successful close also restores Breeze. Unsaved game progress can be lost.

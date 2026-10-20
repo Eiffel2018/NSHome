@@ -233,7 +233,7 @@ void answerError(int fd, const char* reason) {
                       "protocol-error-response");
 }
 
-bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0) {
+bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0, bool stop = false) {
     if (!g_wake)
         return sendAll(fd, "ERR launch-bridge-unavailable\n", "launch-unavailable");
     std::uint64_t id = 0;
@@ -248,7 +248,7 @@ bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0) {
                 g_nextId = 1;
             g_currentId = id;
             g_path = path;
-            g_kind = titleId ? RequestKind::StartGame : RequestKind::Nro;
+            g_kind = stop ? RequestKind::StopGame : titleId ? RequestKind::StartGame : RequestKind::Nro;
             g_titleId = titleId;
             g_state = "queued";
             g_result = 0;
@@ -327,8 +327,8 @@ const char* dispatchClient(int fd, const std::string& line, const Command& comma
         } else if (command.kind == CommandKind::Launch) {
             if (!queueLaunch(fd, command.argument))
                 return "launch-response-failed";
-        } else if (command.kind == CommandKind::StartGame) {
-            if (!queueLaunch(fd, {}, command.titleId))
+        } else if (command.kind == CommandKind::StartGame || command.kind == CommandKind::StopGame) {
+            if (!queueLaunch(fd, {}, command.titleId, command.kind == CommandKind::StopGame))
                 return "game-start-response-failed";
         } else if (command.kind == CommandKind::Press) {
             if (g_inputBlocked.load()) {

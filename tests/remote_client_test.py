@@ -47,6 +47,7 @@ class RemoteClientTests(unittest.TestCase):
 
     def test_all_text_operations_and_parameters(self):
         cases = [
+            (lambda: self.client.game_stop('0100000000000001'), 'gamestop 0100000000000001'),
             (lambda: self.client.status(), 'status'),
             (lambda: self.client.controller(), 'controller status'),
             (lambda: self.client.controller('on'), 'controller on'),
@@ -157,7 +158,7 @@ class RemoteClientTests(unittest.TestCase):
             lambda: self.client.touch('double', 1, 1, 301), lambda: self.client.touch('double', 1, 1, 50, 49),
             lambda: self.client.touch('double', 1, 1, 50, 501), lambda: self.client.touch('tap', 1, 1, gap=150),
             lambda: self.client.controller('lease'), lambda: self.client.home_arm(0),
-            lambda: self.client.home_arm(10**19), lambda: self.client.game_start('0' * 16),
+            lambda: self.client.home_arm(10**19), lambda: self.client.game_start('0' * 16), lambda: self.client.game_stop('0' * 16),
             lambda: self.client.game_start('0x0100000000000001'), lambda: self.client.launch('/../a.nro'),
             lambda: self.client.launch('/switch//a.nro'), lambda: self.client.launch('/switch/a.nro\nstatus'),
             lambda: self.client.launch('/' + '測' * 170 + '.nro'),
@@ -191,7 +192,7 @@ class RemoteClientTests(unittest.TestCase):
                 'stick L 640 360 100', 'touch tap 640 360 100', 'touch double 640 360 100 100',
                 'touch long 640 360 600', 'capture 2', 'home status', 'home arm 9', 'home off',
                 'launch sdmc:/hbmenu.nro', 'gamestart 0100000000000001', 'press HOME 100', 'press CAPTURE 100',
-                'titles refresh',
+                'titles refresh', 'gamestop 0100000000000001',
             ]
             samples = sorted((ROOT / 'samples').glob('[0-9][0-9]_*.py'))
             self.assertEqual(len(samples), len(expected))
@@ -214,7 +215,7 @@ class RemoteClientTests(unittest.TestCase):
                                     for c in request.call_args_list]
                         if command=='titles refresh':
                             self.assertEqual(commands,['titles refresh','titles page 1 1 0 16','titles status'])
-                        elif command in ('auth', 'status', 'controller status') or command.startswith(('capture ', 'home ', 'launch ', 'gamestart ')):
+                        elif command in ('auth', 'status', 'controller status') or command.startswith(('capture ', 'home ', 'launch ', 'gamestart ', 'gamestop ')):
                             self.assertEqual(commands, [command])
                         else:
                             self.assertEqual(commands, ['controller on', command, 'controller off'])
