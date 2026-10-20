@@ -30,14 +30,18 @@ Original Nintendo qlaunch remains in use.
 
 TCP6802 uses `switch/Breeze/config.ini`, section `[PC connect]`.
 Controls, touch, capture and diagnostics work independently of Breeze6801.
-Version 0.1.8 provides PC6802 game launch; generic NRO launch still
-returns `launch-bridge-unavailable`. Version 0.1.7 rejects both.
+Version 0.1.9 adds generic NRO launch; 0.1.8 supports only PC6802 game launch.
+The 0.1.10 development worker also identifies manually opened Breeze and pairs
+HOME with an existing game after checking its native foreground state.
 The matched Breeze loader pair above is required for automatic return.
 See [launch behavior, origin rules and pending checks](LAUNCH.md).
 Use bounded input pulses, disable the input gate afterwards, and never replay
 an input whose result is unknown.
 
 The module automatically arms after its scoped PC6802 launch verifies Breeze.
+Development source also handles manually opened foreground Breeze, without a PC
+launch or `home arm` command. It borrows the native accessor without closing it.
+Other NROs remain unpaired; returning to hbmenu restores ordinary HOME.
 For the separate manual diagnostic control, with Breeze in front,
 verify its6801 service, then send authenticated6802 `home status` followed by
 `home arm GENERATION`, using the current `album` generation. A live game is

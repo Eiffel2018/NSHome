@@ -7,8 +7,9 @@ qlaunch and switches HOME between a running game and the same resident Breeze.
 
 **0.1.9 has reported serious qlaunch/DBI regressions and is not recommended for
 normal use.** Returning to stock HOME and DBI's L3 NSP launch can require a reboot.
-The source contains a candidate fix; it has compiled and passed host checks but
-has not yet passed the affected DBI workflow on hardware.
+The 0.1.10 development source adds manual Breeze HOME pairing and fixes stale
+AM session classification and idle-client blocking. Bounded
+device regression checks passed; the published 0.1.9 ZIP does not contain these fixes.
 
 Download `NSHome-v0.1.9.zip` from the [0.1.9 preview](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.9).
 Copy both `atmosphere` and `switch` to the SD root and reboot.
@@ -19,6 +20,8 @@ an existing SwitchU HOME replacement. Breeze is installed separately.
 
 - Original qlaunch; independent module ID `00FF4E5348414D01`.
 - Authenticated TCP 6802 controls, touch and JPEG capture, independent of Breeze UI.
+- Development source: manually opened Breeze is identified and HOME is paired
+  automatically with the existing game. Exiting to hbmenu restores ordinary HOME.
 - PC6802 game start selects the first system-listed user, initializes Breeze,
   returns to the game and automatically enables HOME switching.
 - Direct 6802 SD NRO launch, including Breeze and hbmenu, without a separate

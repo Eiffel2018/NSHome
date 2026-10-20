@@ -206,6 +206,18 @@ OFF is a cleanup attempt, not a replay of the original operation; if it fails,
 the sample reports that failure. No sample connects to 6801, reboots the console,
 or falls back to another input service.
 
+## Development connection handling (0.1.10)
+
+The listener keeps up to four partially authenticated/idle connections without
+letting one own the worker. Each authentication/command phase has a five-second
+deadline; incomplete bytes do not extend it. Completed operations remain serialized.
+Breeze identity probes use nonblocking I/O on that worker. `status` appends
+`build` and `boot` fields; `boot` identifies this module startup, not a request.
+
+Manually opened foreground Breeze now enables HOME automatically when a live
+game/accessor pair is available. This does not select a user or launch a game.
+Going back to hbmenu invalidates the Breeze proof and restores stock HOME.
+
 ## Use the client in your Python program
 
 Add the repository's `tools` directory to your Python import path:

@@ -1,4 +1,4 @@
-# PC launch and background Breeze (0.1.9)
+# PC launch and background Breeze
 
 ## Reported regression and source candidate
 
@@ -14,9 +14,21 @@ after a generic NRO request. A pending PC transaction or changed qlaunch/NRO
 identity invalidates the deferred handoff. Release acknowledgement failure does
 not prevent a bounded native exit of the same verified holder.
 
-Host checks and native compilation passed; actual DBI L3 and native HOME
-verification is still required. Do not treat this source candidate as a validated
-fix or install it while another user owns the console.
+The 0.1.10 development build passed bounded console checks on 2026-10-20:
+manual game ¡÷ Album/hbmenu ¡÷ Breeze armed automatically; six HOME transitions
+retained the same Breeze PID; Breeze ¡÷ hbmenu ¡÷ HOME returned to stock qlaunch.
+DBI opened through 6802, then L3 launched the selected game through the native
+user selector. PC6802 game start still selected the first user, initialized
+Breeze and returned to the game. A native Breeze instance was also replaced by
+an explicit 6802 Breeze request. No save was loaded.
+
+The source resets AM interface mappings when a server-session address is reused.
+Manual Breeze identification checks its actual foreground state and borrows the
+qlaunch accessor without owning or closing it. Nonblocking identity probes and
+per-peer input buffers prevent idle sockets from monopolizing 6802. With two
+idle peers held open, eight status calls passed in 0.16¡V0.17 seconds each;
+combined auth/command framing also passed. This is not general firmware/game,
+sleep/wake or endurance validation. The public 0.1.9 ZIP remains unchanged.
 
 This experimental release keeps stock qlaunch. It remains
 installed and owns applications. Source `43c5a28` passed bounded device checks:
