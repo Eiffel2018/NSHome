@@ -35,6 +35,9 @@ build/tests/remote_session
 
 g++ "${flags[@]}" -Isource tests/forward_objects_test.cpp -o build/tests/forward_objects
 build/tests/forward_objects
+
+g++ "${flags[@]}" -Isource tests/installed_titles_test.cpp -o build/tests/installed_titles
+build/tests/installed_titles
 for component in protocol input touch capture; do
     includes=()
     case "$component" in

@@ -8,7 +8,7 @@
 namespace nshome::remote {
 
 constexpr const char* kRemoteChannelVersionMarker = "remote channel v7";
-constexpr const char* kBuildVersion = "0.1.10-dev";
+constexpr const char* kBuildVersion = "0.1.11-dev";
 
 enum class RequestKind { Nro, StartGame };
 

@@ -2,8 +2,10 @@
 """NSHome TCP 6802 client. Python 3.10+, standard library, no automatic retries."""
 from contextlib import contextmanager
 import math
+import json
 import re
 import socket
+import time
 import warnings
 
 BUTTONS = (
@@ -61,16 +63,16 @@ class Client:
         self._code = code
 
     @staticmethod
-    def _line(reader):
-        data = reader.readline(2049)
-        if len(data) > 2048 or not data.endswith(b'\n'):
+    def _line(reader, limit=2048):
+        data = reader.readline(limit + 1)
+        if len(data) > limit or not data.endswith(b'\n'):
             raise ProtocolError('Incomplete or oversized response; do not replay the operation')
         try:
             return data.decode('utf-8').rstrip('\r\n')
         except UnicodeDecodeError as error:
             raise ProtocolError('Invalid response encoding') from error
 
-    def _exchange(self, command=None, binary=False):
+    def _exchange(self, command=None, binary=False, line_limit=2048):
         # The server accepts exactly one authenticated operation per connection.
         if command is not None and (not command or len(command.encode()) > 528
                 or any(ord(c) < 32 or ord(c) == 127 for c in command)):
@@ -86,7 +88,7 @@ class Client:
                 if command is None:
                     return 'OK auth'
                 sock.sendall((command + '\n').encode('utf-8'))
-                reply = self._line(reader)
+                reply = self._line(reader, line_limit)
                 if reply.startswith('ERR '):
                     raise RemoteError(reply)
                 if not reply.startswith('OK '):
@@ -115,6 +117,116 @@ class Client:
     def status(self):
         """Launch queue status, not controller state or application readiness."""
         return self._exchange('status')
+
+    @staticmethod
+    def _decimal(value, name, allow_zero=False):
+        text = str(value) if type(value) is int else value
+        if (not isinstance(text, str) or not re.fullmatch(r'0|[1-9][0-9]{0,19}', text)
+                or int(text) > 2**64-1 or (not allow_zero and text == '0')):
+            raise ValueError(f'{name} must be an exact unsigned decimal integer')
+        return text
+
+    def _titles(self, command):
+        reply = self._exchange(command, line_limit=65536)
+        if not reply.startswith('OK titles '):
+            raise ProtocolError('Unexpected title catalogue reply')
+        try:
+            def unique(pairs):
+                out = {}
+                for key, value in pairs:
+                    if key in out:
+                        raise ValueError('Duplicate JSON key')
+                    out[key] = value
+                return out
+            result = json.loads(reply[10:], object_pairs_hook=unique)
+            if (not isinstance(result, dict) or type(result.get('schema')) is not int
+                    or result['schema'] != 1 or result.get('source') != 'ns+ncm.full_application_contents'
+                    or result.get('state') not in ('idle', 'building', 'ready', 'failed', 'invalidated')
+                    or type(result.get('page_max')) is not int or result['page_max'] != 16 or result.get('profile_selection_supported') is not False
+                    or type(result.get('total')) is not int or not 0 <= result['total'] <= 4096
+                    or type(result.get('scanned')) is not int or not result['total'] <= result['scanned'] <= 4096
+                    or not re.fullmatch(r'0x[0-9A-F]{8}', result.get('rc', ''))):
+                raise ValueError('Invalid catalogue schema')
+            for name in ('boot', 'generation'):
+                if not isinstance(result.get(name), str):
+                    raise ValueError('Identity must be a decimal string')
+                self._decimal(result[name], name, allow_zero=name == 'generation')
+        except (TypeError, ValueError) as error:
+            raise ProtocolError('Malformed title catalogue: ' + str(error)) from error
+        return result
+
+    def titles_refresh(self):
+        """Queue a read-only background rebuild; no automatic resubmission."""
+        return self._titles('titles refresh')
+
+    def titles_status(self):
+        return self._titles('titles status')
+
+    def titles_page(self, boot, generation, offset=0, limit=16):
+        boot = self._decimal(boot, 'boot')
+        generation = self._decimal(generation, 'generation')
+        integer(offset, 0, 4096, 'offset')
+        integer(limit, 1, 16, 'limit')
+        result = self._titles(f'titles page {boot} {generation} {offset} {limit}')
+        rows = result.get('items')
+        end = offset + len(rows) if isinstance(rows, list) else -1
+        if (result['boot'] != boot or result['generation'] != generation or result['state'] != 'ready'
+                or result['rc'] != '0x00000000' or type(result.get('offset')) is not int or result['offset'] != offset
+                or not isinstance(rows, list) or len(rows) > limit or end > result['total']
+                or (result.get('next') is not None and type(result['next']) is not int)
+                or (result.get('next') != (end if end < result['total'] else None))
+                or (end < result['total'] and not rows)):
+            raise ProtocolError('Stale or inconsistent title page')
+        seen = set()
+        for row in rows:
+            if (not isinstance(row, dict) or not isinstance(row.get('title_id'), str)
+                    or not re.fullmatch(r'[0-9A-F]{16}', row['title_id'])
+                    or row['title_id'] == '0000000000000000' or row['title_id'] in seen
+                    or 'name' not in row or (row['name'] is not None and not isinstance(row['name'], str))
+                    or row.get('name_source') not in ('unavailable', 'nacp.system_language', 'nacp.first_available')
+                    or not isinstance(row.get('name_rc'), str) or not re.fullmatch(r'0x[0-9A-F]{8}', row['name_rc'])
+                    or type(row.get('storage_id')) is not int or row['storage_id'] not in (2, 4, 5)):
+                raise ProtocolError('Invalid installed title entry')
+            seen.add(row['title_id'])
+        return result
+
+    def installed_titles(self, wait=60, page_size=16):
+        """Refresh once, then read that snapshot. Changes/errors never trigger a retry."""
+        if not math.isfinite(wait) or not 0 < wait <= 120:
+            raise ValueError('wait must be greater than 0 and at most 120 seconds')
+        integer(page_size, 1, 16, 'page_size')
+        deadline = time.monotonic() + wait
+        result = self.titles_refresh()
+        identity = result['boot'], result['generation']
+        while result['state'] == 'building':
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Catalogue still building; query status, do not auto-refresh')
+            time.sleep(0.2)
+            result = self.titles_status()
+            if (result['boot'], result['generation']) != identity:
+                raise ProtocolError('Catalogue changed while building')
+        if result['state'] != 'ready':
+            raise RemoteError('Title catalogue ' + result['state'] + ' rc=' + result['rc'])
+        rows, seen, offset = [], set(), 0
+        while True:
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Catalogue deadline elapsed; partial results discarded')
+            page = self.titles_page(*identity, offset, page_size)
+            if page['total'] != result['total']:
+                raise ProtocolError('Catalogue size changed')
+            for row in page['items']:
+                if row['title_id'] in seen:
+                    raise ProtocolError('Duplicate title across pages')
+                seen.add(row['title_id'])
+                rows.append(row)
+            if page['next'] is None:
+                break
+            offset = page['next']
+        latest = self.titles_status()
+        if (latest['boot'], latest['generation']) != identity or latest['state'] != 'ready':
+            raise ProtocolError('Catalogue invalidated while paging')
+        result['items'] = rows
+        return result
 
     def controller(self, action='status'):
         if action not in ('on', 'off', 'status'):

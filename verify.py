@@ -119,6 +119,11 @@ def verify(elf_path, nsp_path, disassembly_path):
     require(len(wrapped) >= 2 and all(s != '__wrap_' + FORWARD for s in wrapped), 'root/domain framework forwarding must use wrapper')
     nro_connected = any('worker' in source and 'launch_nro' in target for source, target in allocator_calls)
     require(nro_connected, 'launch worker must call the requested NRO consumer')
+    titles_calls = ['nsListApplicationRecord', 'nsIsAnyApplicationEntityInstalled',
+                    'nsListApplicationContentMetaStatus', 'nsGetApplicationControlData',
+                    'ncmContentMetaDatabaseGetLatestContentMetaKey', 'ncmContentMetaDatabaseListContentInfo', 'ncmContentStorageHas']
+    titles_connected = all(name in functions for name in titles_calls) and any(name.startswith('_ZN6nshome6titles5startE') for name in functions)
+    require(titles_connected, 'installed title worker and NS/NCM evidence calls must be linked')
     receipt = {
         'program_id': f'{PROGRAM_ID:016X}',
         'checks': ['ELF64 AArch64', 'executable entry', 'PFS0', 'NSO bounds', 'NPDM ID', 'linked forwarding branches', 'unified newlib allocation'],
@@ -128,6 +133,8 @@ def verify(elf_path, nsp_path, disassembly_path):
         'launch_bridge_connected': '_ZN8observer6launch5startEv' in functions,
         'launch_flow_hardware_tested': False,
         'nro_launch_connected': nro_connected,
+        'installed_titles_connected': titles_connected,
+        'installed_titles_hardware_tested': False,
         'launch_commands': ['gamestart', 'launch'] if '_ZN8observer6launch5startEv' in functions else [],
     }
     (nsp_path.parent / 'verification.json').write_text(json.dumps(receipt, indent=2) + '\n')

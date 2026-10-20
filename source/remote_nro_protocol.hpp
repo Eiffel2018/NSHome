@@ -24,6 +24,9 @@ enum class CommandKind {
     Controller,
     Capture,
     Touch,
+    TitlesRefresh,
+    TitlesStatus,
+    TitlesPage,
 };
 
 struct Command {
@@ -35,6 +38,7 @@ struct Command {
     std::int32_t stickY = 0;
     std::uint32_t gapMs = 0;
     std::uint64_t titleId = 0;
+    std::uint64_t numbers[4]{};
 };
 
 // Parses one protocol line (without its terminating CR/LF). Launch paths keep

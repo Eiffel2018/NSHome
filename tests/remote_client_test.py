@@ -2,6 +2,7 @@
 """Offline transport, validation and runnable-sample tests; never uses a console."""
 import importlib.util
 import io
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -184,12 +185,13 @@ class RemoteClientTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             args = SimpleNamespace(action='status', key='A', keys='L+R', ms=100,
                 side='L', x=640, y=360, gap=100, stack=2, generation=9,
-                path='/hbmenu.nro', title_id='0100000000000001', output=Path(directory) / 'screen.jpg')
+                path='/hbmenu.nro', title_id='0100000000000001', output=Path(directory) / 'screen.jpg', wait=60, page_size=16)
             expected = [
                 'auth', 'status', 'controller status', 'press A 100', 'press L+R 100',
                 'stick L 640 360 100', 'touch tap 640 360 100', 'touch double 640 360 100 100',
                 'touch long 640 360 600', 'capture 2', 'home status', 'home arm 9', 'home off',
                 'launch sdmc:/hbmenu.nro', 'gamestart 0100000000000001', 'press HOME 100', 'press CAPTURE 100',
+                'titles refresh',
             ]
             samples = sorted((ROOT / 'samples').glob('[0-9][0-9]_*.py'))
             self.assertEqual(len(samples), len(expected))
@@ -199,15 +201,20 @@ class RemoteClientTests(unittest.TestCase):
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     args.ms = 600 if 'touch_long' in path.name else 100
-                    def exchange(line=None, binary=False):
+                    def exchange(line=None, binary=False, line_limit=2048):
                         if binary:
                             return b'\xff\xd8\xff\xd9'
+                        if line and line.startswith('titles '):
+                            return 'OK titles '+json.dumps(dict(schema=1,source='ns+ncm.full_application_contents',boot='1',generation='1',
+                                state='ready',rc='0x00000000',total=0,scanned=0,page_max=16,profile_selection_supported=False,offset=0,next=None,items=[]))
                         return 'OK auth' if line is None else 'OK result'
                     with patch.object(self.client, '_exchange', side_effect=exchange) as request:
                         module.action(self.client, args)
                         commands = ['auth' if c.args[0:1] == () or c.args[0] is None else c.args[0]
                                     for c in request.call_args_list]
-                        if command in ('auth', 'status', 'controller status') or command.startswith(('capture ', 'home ', 'launch ', 'gamestart ')):
+                        if command=='titles refresh':
+                            self.assertEqual(commands,['titles refresh','titles page 1 1 0 16','titles status'])
+                        elif command in ('auth', 'status', 'controller status') or command.startswith(('capture ', 'home ', 'launch ', 'gamestart ')):
                             self.assertEqual(commands, [command])
                         else:
                             self.assertEqual(commands, ['controller on', command, 'controller off'])

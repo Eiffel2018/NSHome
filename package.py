@@ -14,6 +14,8 @@ if not json.loads((build / 'verification.json').read_text())['launch_bridge_conn
     raise ValueError('Rebuild the module with the game launch bridge before packaging')
 if not json.loads((build / 'verification.json').read_text()).get('nro_launch_connected'):
     raise ValueError('Rebuild the matched module and loader with NRO launch support')
+if not json.loads((build / 'verification.json').read_text()).get('installed_titles_connected'):
+    raise ValueError('Rebuild the module with the installed application catalogue')
 destination = Path(sys.argv[1]).resolve()
 if destination.exists():
     raise FileExistsError(destination)
@@ -38,7 +40,7 @@ files = {
     'extras/auto-unlock/config/NSHome/skip-lock-screen.flag': b'',
 }
 # Include the runnable PC samples alongside their shared client and reference.
-for pattern in ('samples/*.py', 'samples/*.md', 'tools/nshome_remote.py', 'docs/REMOTE_6802.md', 'docs/LAUNCH.md'):
+for pattern in ('samples/*.py', 'samples/*.md', 'tools/nshome_remote.py', 'docs/REMOTE_6802.md', 'docs/LAUNCH.md', 'docs/INSTALLED_TITLES.md'):
     for path in root.glob(pattern):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
 # Include corresponding module source and the pinned dependency build recipe.

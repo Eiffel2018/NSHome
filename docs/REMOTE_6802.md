@@ -206,6 +206,13 @@ OFF is a cleanup attempt, not a replay of the original operation; if it fails,
 the sample reports that failure. No sample connects to 6801, reboots the console,
 or falls back to another input service.
 
+## Installed applications (0.1.11 development source)
+
+[Sample 18 and exact schema/options](INSTALLED_TITLES.md) provide a read-only
+NS/NCM-verified catalogue: `titles refresh`, `titles status`, and
+`titles page BOOT GENERATION OFFSET LIMIT`. No account-list or UID-launch API.
+Offline implementation/build is separate from console validation.
+
 ## Development connection handling (0.1.10)
 
 The listener keeps up to four partially authenticated/idle connections without

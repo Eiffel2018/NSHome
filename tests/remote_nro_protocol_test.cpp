@@ -8,6 +8,14 @@
 using namespace nshome::remote;
 
 int main() {
+    assert(parseCommand("titles refresh").kind==CommandKind::TitlesRefresh);
+    assert(parseCommand("titles status").kind==CommandKind::TitlesStatus);
+    const auto page=parseCommand("titles page 9007199254740993 7 0 16");
+    assert(page.kind==CommandKind::TitlesPage && page.numbers[0]==9007199254740993ULL && page.numbers[3]==16);
+    for (const char* bad : {"titles page 0 1 0 16","titles page 1 0 0 16","titles page 1 1 -1 16","titles page 1 1 4097 16",
+         "titles page 1 1 0 17","titles page 1 1 0 0","titles page 1 1 0 16 extra","titles page 1 1 0",
+         "titles page 01 1 0 16","titles page 18446744073709551616 1 0 16","titles page +1 1 0 16"})
+        assert(parseCommand(bad).kind==CommandKind::Invalid);
     const auto game = parseCommand("gamestart 0100005027a18000");
     assert(game.kind == CommandKind::StartGame && game.titleId == 0x0100005027A18000ULL);
     for (const char* bad : {"gamestart 0000000000000000", "gamestart 0100005027A1800",

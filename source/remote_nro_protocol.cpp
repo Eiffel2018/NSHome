@@ -48,6 +48,21 @@ Command parseCommand(std::string_view line) {
     }
     if (equalAsciiCaseInsensitive(line, "status"))
         return {CommandKind::Status, {}};
+    if (line=="titles refresh") return {CommandKind::TitlesRefresh,{}};
+    if (line=="titles status") return {CommandKind::TitlesStatus,{}};
+    if (line.substr(0,12)=="titles page ") {
+        auto args=line.substr(12); Command out{CommandKind::TitlesPage,{}};
+        for (unsigned i=0;i<4;++i) {
+            const auto end=args.find(' '); const auto word=args.substr(0,end);
+            if (word.empty() || word.size()>20 || (word.size()>1 && word[0]=='0') || word[0]<'0' || word[0]>'9') return {};
+            const auto parsed=std::from_chars(word.data(),word.data()+word.size(),out.numbers[i]);
+            if (parsed.ec!=std::errc{} || parsed.ptr!=word.data()+word.size()) return {};
+            if (i==3) { if (end!=std::string_view::npos) return {}; }
+            else { if (end==std::string_view::npos) return {}; args.remove_prefix(end+1); }
+        }
+        if (!out.numbers[0] || !out.numbers[1] || out.numbers[2]>4096 || !out.numbers[3] || out.numbers[3]>16) return {};
+        return out;
+    }
     if (line.substr(0, 10) == "gamestart ") {
         const auto text = line.substr(10);
         std::uint64_t tid = 0;

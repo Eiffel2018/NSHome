@@ -8,6 +8,7 @@
 #include "remote_nro_input.hpp"
 #include "remote_nro_capture.hpp"
 #include "remote_nro_touch.hpp"
+#include "remote_nro_titles.hpp"
 #include "home_bridge.hpp"
 #include "launch_bridge.hpp"
 #include <switch.h>
@@ -275,6 +276,8 @@ const char* dispatchClient(int fd, const std::string& line, const Command& comma
             if (!sendAll(fd, response, "home-response")) return "home-response-failed";
         } else if (command.kind == CommandKind::Status) {
             sendStatus(fd);
+        } else if (command.kind == CommandKind::TitlesRefresh || command.kind == CommandKind::TitlesStatus || command.kind == CommandKind::TitlesPage) {
+            if (!sendAll(fd,nshome::titles::command(command),"titles-response")) return "titles-response-failed";
         } else if (command.kind == CommandKind::Controller) {
             Result rc = 0;
             if (command.argument == "off") {
@@ -573,6 +576,7 @@ bool start(void (*wake)()) {
             return true;
         g_code = std::move(settings.code);
         g_bootTick = armGetSystemTick();
+        if (!nshome::titles::start(g_bootTick)) diagnostic("titles-worker-unavailable");
         g_wake = wake;
         g_running.store(true);
         const auto created = ams::os::CreateThread(&g_thread, serverThread, nullptr,

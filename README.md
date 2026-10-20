@@ -18,6 +18,8 @@ an existing SwitchU HOME replacement. Breeze is installed separately.
 
 ## Features
 
+- Development source: [read-only installed application catalogue](docs/INSTALLED_TITLES.md)
+  with NS/NCM installation evidence and snapshot pagination. Not yet console-tested.
 - Original qlaunch; independent module ID `00FF4E5348414D01`.
 - Authenticated TCP 6802 controls, touch and JPEG capture, independent of Breeze UI.
 - Development source: manually opened Breeze is identified and HOME is paired
@@ -30,7 +32,7 @@ an existing SwitchU HOME replacement. Breeze is installed separately.
   while the game owns foreground. Background BP hit, 16 instruction steps,
   continue and HOME round trips passed on the test console.
 - Optional visually checked boot touch unlock.
-- [17 Python samples and all 6802 options](samples/README.md), standard library only.
+- [18 Python samples and all 6802 options](samples/README.md), standard library only.
 
 This release is experimental. Tests used Breeze beta125.05, gen2 v0.20 and
 one game at its main menu, without loading a save. Other firmware/games,
