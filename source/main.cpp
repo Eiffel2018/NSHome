@@ -2,6 +2,7 @@
 #include "trace.hpp"
 #include "home_bridge.hpp"
 #include "launch_bridge.hpp"
+#include "pm_stop.hpp"
 #include <cstdlib>
 
 // Commands normally relay unchanged. The launch wrapper scopes PC launch handling.
@@ -60,6 +61,7 @@ void Main() {
     observer::startup(3, installed.GetValue());
     R_ABORT_UNLESS(installed);
     observer::startup(4);
+    observer::start_pm_stop();
     manager.LoopProcess();
 }
 }

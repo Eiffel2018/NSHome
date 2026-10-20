@@ -11,6 +11,7 @@
 #include "home_bridge.hpp"
 #include "close_screen.hpp"
 #include "remote_nro_input.hpp"
+#include "pm_stop.hpp"
 #include "remote_nro_server.hpp"
 #include "trace.hpp"
 #include <array>
@@ -44,6 +45,12 @@ Policy policy;
 NativeHandoff native_handoff;
 std::uint32_t current_application{};
 bool enabled{};
+bool native_home_entered{};
+struct CompatibilityStop {
+    u64 caller{}, target{}, epoch{}, sequence{};
+    Result result{};
+    bool pending{}, running{}, done{}, cancelled{};
+} compatibility;
 ams::os::ThreadType thread;
 alignas(0x1000) std::uint8_t stack[0x10000];
 std::atomic<bool> signalled{};
@@ -485,7 +492,8 @@ Result application_pid(u64& pid) {
 bool close_identity(const CloseContext& value) {
     auto& c=*value.connection;
     std::scoped_lock lock(mutex);
-    if (qepoch!=c.epoch || current_application!=value.object) return false;
+    if (qepoch!=c.epoch || current_application!=value.object ||
+        (compatibility.running && compatibility.cancelled)) return false;
     u64 pid=0,title=0;
     if (R_FAILED(application_pid(pid)) || pid!=value.pid) return false;
     auto app=borrowed(c.connection,value.object);
@@ -578,6 +586,40 @@ void worker(void*) {
     for (;;) {
         auto time = now();
         const auto connected = connection.open();
+        CompatibilityStop external{};
+        {
+            std::scoped_lock lock(mutex);
+            if (compatibility.pending && !compatibility.cancelled) {
+                compatibility.pending=false;
+                compatibility.running=true;
+                external=compatibility;
+            }
+        }
+        if (external.running) {
+            Result rc=connected;
+            nshome::remote::Request close;
+            u64 pid=0;
+            if (R_SUCCEEDED(rc) && (connection.epoch!=external.epoch ||
+                R_FAILED(application_pid(pid)) || pid!=external.target)) rc=Cancelled;
+            if (R_SUCCEEDED(rc)) {
+                std::scoped_lock lock(mutex);
+                const auto* a=latest_album();
+                if (!a || a->pid!=external.caller || a->generation!=proven || !current_application) rc=Cancelled;
+                else {
+                    auto app=borrowed(connection.connection,current_application);
+                    rc=serviceDispatchOut(&app,120,close.titleId);
+                }
+            }
+            if (R_SUCCEEDED(rc)) rc=stop_game(connection,holder,holder_generation,close);
+            startup(121,rc);
+            {
+                std::scoped_lock lock(mutex);
+                compatibility.result=rc;
+                compatibility.running=false;
+                compatibility.done=true;
+            }
+            continue;
+        }
         if (R_SUCCEEDED(connected)) background_tick(connection, holder, holder_generation);
         if (manual_generation && (!home::matches_library(manual_snapshot) ||
             !background_current(connection,manual_generation))) manual_generation = 0;
@@ -768,6 +810,42 @@ void request_stock_home(const void* session) {
     const auto* a = latest_album();
     if (a && !policy.pending()) native_handoff.request(qepoch, a->pid, NativeReason::Home);
 }
+bool native_home_ready() {
+    std::scoped_lock lock(mutex);
+    return enabled && native_home_entered && qroot();
+}
+bool compatibility_stop(std::uint64_t caller,std::uint64_t target,std::uint32_t& result) {
+    u64 live=0;
+    if (R_FAILED(application_pid(live)) || !target || target!=live) return false;
+    u64 sequence=0;
+    {
+        std::scoped_lock lock(mutex);
+        const auto* a=latest_album();
+        if (!enabled || !a || a->pid!=caller || a->generation!=proven) return false;
+        if (compatibility.pending || compatibility.running || policy.pending()) { result=Busy; return true; }
+        sequence=compatibility.sequence+1;
+        compatibility={caller,target,qepoch,sequence,0,true,false,false,false};
+    }
+    startup(122,0,static_cast<u32>(target));
+    wake();
+    const auto deadline=now()+35000;
+    do {
+        {
+            std::scoped_lock lock(mutex);
+            if (compatibility.sequence!=sequence) { result=Cancelled; return true; }
+            if (compatibility.done) { result=compatibility.result; return true; }
+            if (qepoch!=compatibility.epoch) { compatibility.cancelled=true; compatibility.pending=false; result=Cancelled; return true; }
+        }
+        ams::os::SleepThread(ams::TimeSpan::FromMilliSeconds(20));
+    } while (now()<deadline);
+    {
+        std::scoped_lock lock(mutex);
+        compatibility.cancelled=true;
+        compatibility.pending=false;
+    }
+    result=KERNELRESULT(TimedOut);
+    return true;
+}
 void wake() { signalled.store(true); }
 bool start() {
     const auto rc = ams::os::CreateThread(&thread, worker, nullptr, stack, sizeof(stack), 17, 3);
@@ -782,7 +860,7 @@ void register_root(const std::shared_ptr<Service>& forward, std::uint64_t pid, b
     std::scoped_lock lock(mutex);
     for (auto& r : roots) if (r.service.expired()) {
         r = {forward, nullptr, pid, ++serial, 0, qlaunch};
-        if (qlaunch) { qepoch = r.generation; current_application = 0; policy.cancel(); }
+        if (qlaunch) { qepoch = r.generation; native_home_entered=false; current_application = 0; policy.cancel(); }
         return;
     }
 }
@@ -829,6 +907,7 @@ void observe(const void* session, Kind kind, const Request& request, const Reply
     }
     if (kind == Kind::Root && reply.object) source->proxy = reply.object;
     if (!source->qlaunch) return;
+    if (kind == Kind::Home && request.command == 12) native_home_entered=true;
     if (kind == Kind::Common && request.command == 1 && (reply.scalar == 20 || reply.scalar == 25)) policy.cancel();
     // Message 50 remains visible to stock qlaunch, which owns the launch and selector logic.
     if (kind == Kind::Common && request.command == 1 && reply.scalar == 50) {

@@ -7,7 +7,7 @@ ATMOSPHERE_BUILD_NAME := release
 include $(ATMOSPHERE_LIBRARIES_DIR)/config/templates/stratosphere.mk
 
 TARGET := build/am-observer
-SOURCES := source/main.cpp source/runtime.cpp source/forward.cpp source/home_bridge.cpp source/launch_bridge.cpp source/launch_ecs.cpp source/log.cpp source/remote.cpp source/boot.cpp source/boot_screen.cpp source/boot_jpeg.cpp $(wildcard source/remote_nro_*.cpp)
+SOURCES := source/main.cpp source/pm_stop.cpp source/runtime.cpp source/forward.cpp source/home_bridge.cpp source/launch_bridge.cpp source/launch_ecs.cpp source/log.cpp source/remote.cpp source/boot.cpp source/boot_screen.cpp source/boot_jpeg.cpp $(wildcard source/remote_nro_*.cpp)
 OBJECTS := $(SOURCES:source/%.cpp=build/%.o)
 INCLUDE := -Isource -I$(ATMOSPHERE_LIBRARIES_DIR)/libstratosphere/include -I$(ATMOSPHERE_LIBRARIES_DIR)/libvapours/include -I$(DEVKITPRO)/libnx/include
 LIBPATHS := -L$(ATMOSPHERE_LIBRARIES_DIR)/libstratosphere/lib/nintendo_nx_arm64_armv8a/release -L$(DEVKITPRO)/libnx/lib

@@ -20,7 +20,8 @@
     "*"
   ],
   "service_host": [
-    "appletAE"
+    "appletAE",
+    "pm:shell"
   ],
   "kernel_capabilities": [
     {
