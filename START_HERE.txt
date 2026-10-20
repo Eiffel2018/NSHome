@@ -1,4 +1,4 @@
-NSHome 0.1.12 - experimental preview
+NSHome 0.1.13 - experimental preview
 
 INSTALL
 1. Use an existing Atmosphere installation with original Nintendo HOME.
@@ -24,9 +24,11 @@ PC CONTROL (OPTIONAL)
 TCP 6802: controls, touch, capture, NRO/game launch, native HOME game close,
 installed application list.
 Breeze TCP 6801: existing files, memory and debugger functions.
-For the corrected Stop game button, use the separate matching
-BreezePC-beta126-NSHome-v0.1.12.zip download. Close and reopen BreezePC after
-updating. Original 6801 clients are unchanged. Stop uses the observed stock
+Original BreezePC beta126's 6801 Stop game works without a PC/NRO patch.
+NSHome redirects the verified Breeze/game termination to original HOME Close,
+then restarts Breeze. A brief disconnect and automatic PC reconnection is expected.
+Do not resend Stop during reconnection. The optional companion ZIP adds 6802
+controls; it is not needed for this fix. Stop requires the observed stock
 1280x720 HOME layout and fails without confirming an unknown screen.
 Python examples and parameters are in samples/README.md. A PC is not required
 for ordinary HOME switching. No pairing code is included in this ZIP.

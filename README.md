@@ -5,7 +5,7 @@ qlaunch and switches HOME between a running game and the same resident Breeze.
 
 ## Download and install
 
-Download `NSHome-v0.1.12.zip` from the [0.1.12 preview](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.12).
+Download `NSHome-v0.1.13.zip` from the [0.1.13 preview](https://github.com/Eiffel2018/NSHome/releases/tag/v0.1.13).
 This experimental build includes the HOME and 6802 connection fixes absent from
 0.1.9 and closes games through the original HOME Menu. Read the known limitations below before installing.
 
@@ -13,9 +13,11 @@ Copy both `atmosphere` and `switch` to the SD root and reboot.
 Read [installation and requirements](docs/INSTALL.md) first, including disabling
 an existing SwitchU HOME replacement. Breeze is installed separately.
 
-For PC control, download the separate `BreezePC-beta126-NSHome-v0.1.12.zip`
-from the same release. Close and reopen BreezePC after updating. Its Stop game
-button uses the new 6802 close flow; unmodified 6801 clients retain their original behavior.
+Original BreezePC beta126 works unchanged, including its 6801 Stop game button.
+NSHome redirects the verified Breeze process's game-termination request to
+the native HOME close flow. Breeze restarts and the original PC reconnects automatically.
+The separate `BreezePC-beta126-NSHome-v0.1.13.zip` is optional for the additional
+6802 controls; it is not required for this Stop fix.
 
 ## Features
 
@@ -35,6 +37,8 @@ button uses the new 6802 close flow; unmodified 6801 clients retain their origin
 - Optional visually checked boot touch unlock.
 - Guarded 6802 Stop game through stock HOME's X/Close flow, then reopen Breeze.
   The observed 1280x720 stock layout is required; unknown screens fail without confirming.
+- Console-side compatibility for original Breeze beta126's 6801 game stop,
+  scoped to the verified Breeze caller and current game PID. Other callers forward unchanged.
 - [19 Python samples and all 6802 options](samples/README.md), standard library only.
 
 This release is experimental. Checks used Breeze beta125.05 and beta126.00,

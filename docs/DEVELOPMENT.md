@@ -6,7 +6,7 @@ Run `bash tests/run.sh`, then `bash build.sh` with `AMS_LIBRARIES` and
 `DEVKITPRO` set. Dependency revisions are pinned in the root README.
 Package with `python3 package.py /absolute/path/to/NSHome.zip`.
 The build checks executable/container formats, module ID, forwarding and allocation.
-Version 0.1.12 was built locally with devkitA64 r30 (GCC 16.1) and the pinned
+Versions 0.1.12/0.1.13 were built locally with devkitA64 r30 (GCC 16.1) and the pinned
 dependencies. Keep the non-LTO Atmosphere library settings in `build.sh`.
 All newlib reentrant allocation entry points, including `_memalign_r` used by
 stdio aligned buffers, must route to Stratosphere. The default newlib memalign
@@ -27,6 +27,13 @@ atmosphere/contents/00FF4E5348414D01/breeze_loader/main.npdm
 
 `mitm.lst` contains exactly `appletAE`, beside `exefs.nsp`.
 Original Nintendo qlaunch remains in use.
+
+The 0.1.13 module also hosts a scoped `pm:shell` MITM, registered only after
+native HOME enters. Keep `mitm.lst` exactly `appletAE`: future-declaring
+`pm:shell` blocks boot before AM registration completes. Its service loop is
+separate from AM so the intercepted Breeze termination can wait for native Close.
+Only a verified Breeze caller targeting the live game PID is redirected.
+The Close flow restarts Breeze, so the original 6801 PC connection is replaced.
 
 ## Remote control and HOME
 

@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (0.1.12), not
+This reference describes the current NSHome source (0.1.13), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -261,3 +261,9 @@ are `--host`, optional `--port` / `--timeout`, and required `--title-id`.
 `OK queued ID` is acceptance only. Poll `status` for the same ID until
 `finished` or `failed`, up to 35 seconds; do not replay an unknown outcome.
 A successful close also restores Breeze. Unsaved game progress can be lost.
+
+Version 0.1.13 also supports unmodified BreezePC beta126's 6801 `gamestop`
+through a console-side interception of the verified Breeze caller's system
+termination request. No 6802 request is needed for that compatibility path.
+Breeze restarts and the PC reconnects automatically; do not replay Stop while
+disconnected. This does not add a 6801 server to NSHome or redirect other callers.

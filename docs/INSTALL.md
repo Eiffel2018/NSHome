@@ -1,4 +1,4 @@
-# NSHome 0.1.12 installation
+# NSHome 0.1.13 installation
 
 Experimental release. UI/network checks used Breeze beta126.00; earlier
 BP/trace checks used beta125.05 and gen2 v0.20 on one console.
@@ -49,17 +49,19 @@ with sample 02 rather than resending it.
 
 ## PC Stop game
 
-Use the matching `BreezePC-beta126-NSHome-v0.1.12.zip` desktop companion from
-the release, or sample 19 with the running game's exact title ID. Close and
-reopen an existing BreezePC window after updating. The Stop button sends one
-6802 request, follows its receipt and reconnects after Breeze reopens.
+Use original BreezePC beta126's normal Stop game button. No PC or Breeze NRO
+patch is required. NSHome intercepts only the identified Breeze process's
+`pm:shell` TerminateProcess request for the current game PID and closes through
+the original HOME Menu. Breeze restarts, briefly disconnecting 6801; original
+BreezePC reconnects automatically. Do not resend Stop during that reconnection.
 
 NSHome closes through original HOME's X/Close confirmation, checking the game,
 foreground and screen before each input. The observed stock 1280x720 layout is
 required. Unknown layouts fail without confirming; there is no force-kill fallback.
-This passed from both game and Breeze foreground with beta126.00. Unsaved progress
-can be lost. Unmodified clients that send Breeze's raw 6801 `gamestop` retain
-their original behavior; that command is not redirected by NSHome.
+This passed from both game and Breeze foreground with unmodified beta126.00 PC
+and NRO. Unsaved progress can be lost. Other callers/targets keep their native
+behavior. The optional desktop companion retains the original 6801 Stop command.
+Sample 19 also provides explicit 6802 Stop with a title-scoped receipt.
 
 ## Background BP and trace
 
