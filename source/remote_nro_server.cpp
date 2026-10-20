@@ -3,6 +3,8 @@
 #include "remote_nro_server.hpp"
 
 #include "remote_nro_protocol.hpp"
+#include "remote_session.hpp"
+#include <array>
 #include "remote_nro_input.hpp"
 #include "remote_nro_capture.hpp"
 #include "remote_nro_touch.hpp"
@@ -33,8 +35,6 @@ constexpr const char* kConfigPath = "sdmc:/switch/Breeze/config.ini";
 // Breeze PC connect owns 6801; SwitchU uses its separate fixed endpoint.
 constexpr std::uint16_t kDefaultPort = 6802;
 constexpr std::size_t kMaxCodeLength = 64;
-constexpr std::uint32_t kClientIdlePollLimit = 1200; // 60 seconds at 50 ms
-constexpr std::uint32_t kUnauthenticatedIdlePollLimit = 100; // 5 seconds
 constexpr const char* kDiagnosticPath = "sdmc:/config/NSHome/remote.log";
 constexpr long kDiagnosticMaxBytes = 128 * 1024;
 std::atomic<bool> g_inputBlocked{false};
@@ -48,12 +48,12 @@ ams::os::ThreadType g_thread{};
 alignas(0x1000) std::uint8_t g_stack[0x10000];
 std::atomic<bool> g_running{false};
 std::atomic<std::uint64_t> g_wakeEpoch{0};
-std::uint64_t g_servingEpoch{}; // worker only
 bool g_started = false;
 bool g_pending = false;
 bool g_busy = false;
 std::uint64_t g_nextId = 1;
 std::uint64_t g_currentId = 0;
+std::uint64_t g_bootTick = 0;
 std::string g_path;
 RequestKind g_kind = RequestKind::Nro;
 std::uint64_t g_titleId = 0;
@@ -216,53 +216,12 @@ void sendStatus(int fd) {
     }
     char buffer[192];
     const int count = std::snprintf(buffer, sizeof(buffer),
-        "OK status id=%llu state=%s rc=0x%08X\n",
-        static_cast<unsigned long long>(id), state.c_str(), result);
+        "OK status id=%llu state=%s rc=0x%08X build=%s boot=%llu\n",
+        static_cast<unsigned long long>(id), state.c_str(), result, kBuildVersion,
+        static_cast<unsigned long long>(g_bootTick));
     if (count > 0 && static_cast<std::size_t>(count) < sizeof(buffer))
         (void)sendAll(fd, std::string_view(buffer, static_cast<std::size_t>(count)),
                       "status-response");
-}
-
-enum class ReadOutcome { Line, PeerClosed, Timeout, Stopped, Error, TooLong };
-
-ReadOutcome readLine(int fd, std::string& line, std::uint32_t& idlePolls,
-                     std::uint32_t pollLimit, int& readError) {
-    line.clear();
-    readError = 0;
-    char buffer[128];
-    while (g_running.load() && idlePolls < pollLimit) {
-        if (g_wakeEpoch.load() != g_servingEpoch) return ReadOutcome::Stopped;
-        const ssize_t received = ::recv(fd, buffer, sizeof(buffer), 0);
-        if (received == 0)
-            return ReadOutcome::PeerClosed;
-        if (received < 0) {
-            if (errno == EINTR)
-                continue;
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                readError = errno;
-                diagnostic("read-failed", fd, readError, socketGetLastResult());
-                return ReadOutcome::Error;
-            }
-            ++idlePolls;
-            sleepPoll();
-            continue;
-        }
-        ++idlePolls;
-        for (ssize_t i = 0; i < received; ++i) {
-            const char c = buffer[i];
-            if (c == '\n') {
-                if (!line.empty() && line.back() == '\r')
-                    line.pop_back();
-                return ReadOutcome::Line;
-            }
-            if (line.size() >= kMaxCommandLength) {
-                diagnostic("command-too-long", fd);
-                return ReadOutcome::TooLong;
-            }
-            line.push_back(c);
-        }
-    }
-    return g_running.load() ? ReadOutcome::Timeout : ReadOutcome::Stopped;
 }
 
 void answerError(int fd, const char* reason) {
@@ -310,61 +269,7 @@ bool queueLaunch(int fd, const std::string& path, std::uint64_t titleId = 0) {
     return sent;
 }
 
-const char* serveClient(int fd) {
-    const int flags = ::fcntl(fd, F_GETFL, 0);
-    if (flags < 0) {
-        diagnostic("accepted-fcntl-get-failed", fd, errno);
-        return "fcntl-get-failed";
-    }
-    if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        diagnostic("accepted-fcntl-set-failed", fd, errno);
-        return "fcntl-set-failed";
-    }
-    diagnostic("accepted-nonblocking", fd);
-    if (!sendAll(fd, "SWITCHU 1\n", "greeting-send"))
-        return "greeting-send-failed";
-    diagnostic("greeting-sent", fd);
-
-    bool authenticated = false;
-    std::uint32_t idlePolls = 0;
-    while (g_running.load()) {
-        std::string line;
-        const std::uint32_t pollLimit = authenticated
-            ? kClientIdlePollLimit : kUnauthenticatedIdlePollLimit;
-        int readError = 0;
-        const ReadOutcome readResult = readLine(fd, line, idlePolls, pollLimit, readError);
-        if (readResult != ReadOutcome::Line) {
-            if (readResult == ReadOutcome::PeerClosed)
-                return "peer-closed";
-            if (readResult == ReadOutcome::Timeout) {
-                diagnostic("client-timeout", fd, ETIMEDOUT);
-                return "client-timeout";
-            }
-            if (readResult == ReadOutcome::Error)
-                return "read-failed";
-            if (readResult == ReadOutcome::TooLong)
-                return "command-too-long";
-            return "server-stopping";
-        }
-        idlePolls = 0;
-        const Command command = parseCommand(line);
-        if (command.kind == CommandKind::Auth) {
-            if (!constantTimeEqual(command.argument, g_code)) {
-                diagnostic("auth-failed", fd);
-                (void)sendAll(fd, "ERR auth\n", "auth-error-response");
-                return "auth-failed";
-            }
-            authenticated = true;
-            diagnostic("auth-ok", fd);
-            if (!sendAll(fd, "OK auth\n", "auth-ok-response"))
-                return "auth-response-failed";
-            continue;
-        }
-        if (!authenticated) {
-            diagnostic("auth-required", fd);
-            (void)sendAll(fd, "ERR auth\n", "auth-required-response");
-            return "auth-required";
-        }
+const char* dispatchClient(int fd, const std::string& line, const Command& command) {
         if (line.substr(0, 5) == "home ") {
             const auto response = observer::home::command(line);
             if (!sendAll(fd, response, "home-response")) return "home-response-failed";
@@ -478,11 +383,42 @@ const char* serveClient(int fd) {
         } else {
             answerError(fd, "invalid-command");
         }
-        // One authenticated operation per connection. A client holding its
-        // socket open cannot monopolize the worker and starve emergency OFF.
-        return "request-complete";
+    return "request-complete";
+}
+
+std::uint64_t monotonicMs() { return armTicksToNs(armGetSystemTick()) / 1000000; }
+struct ClientSlot { int fd = -1; Session session; };
+void closeClient(ClientSlot& slot, const char* reason) {
+    diagnostic(reason, slot.fd);
+    closeSocket(slot.fd); slot.fd = -1;
+}
+void pollClient(ClientSlot& slot) {
+    if (slot.fd < 0) return;
+    if (slot.session.expired(monotonicMs())) { closeClient(slot,"client-timeout"); return; }
+    char bytes[128];
+    // Bounded per peer, including a sender that continually supplies bytes.
+    const auto count = ::recv(slot.fd, bytes, sizeof(bytes), 0);
+    if (!count) { closeClient(slot,"peer-closed"); return; }
+    if (count < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) closeClient(slot,"read-failed");
+        return;
     }
-    return "server-stopping";
+    for (ssize_t i=0; i<count; ++i) {
+        const auto result = slot.session.feed(bytes[i]);
+        if (result == Session::Feed::TooLong) { closeClient(slot,"command-too-long"); return; }
+        if (result != Session::Feed::Line) continue;
+        const auto command = parseCommand(slot.session.line);
+        if (!slot.session.authenticated) {
+            if (command.kind != CommandKind::Auth || !constantTimeEqual(command.argument,g_code)) {
+                answerError(slot.fd,"auth"); closeClient(slot,"auth-failed"); return;
+            }
+            if (!sendAll(slot.fd,"OK auth\n","auth-ok-response")) { closeClient(slot,"auth-response-failed"); return; }
+            slot.session.accept_auth(monotonicMs());
+        } else {
+            // Mutations remain serialized, one operation per authenticated socket.
+            closeClient(slot,dispatchClient(slot.fd,slot.session.line,command)); return;
+        }
+    }
 }
 
 int openListener() {
@@ -511,7 +447,7 @@ int openListener() {
     address.sin_port = htons(kDefaultPort);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
     if (::bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0
-        || ::listen(fd, 2) < 0) {
+        || ::listen(fd, 8) < 0) {
         const int error = errno;
         diagnostic("listener-bind-or-listen-failed", fd, error, socketGetLastResult());
         closeSocket(fd);
@@ -567,6 +503,7 @@ void serverThread(void*) {
                       listening, boundResult, optionResult);
         diagnostic(details, listener, boundError);
         diagnostic("listener-ready", listener);
+        std::array<ClientSlot, 4> clients{};
         bool loggedPoll = false;
 
         while (g_running.load() && g_wakeEpoch.load() == listenerEpoch) {
@@ -576,13 +513,13 @@ void serverThread(void*) {
             const int client = ::accept(listener,
                 reinterpret_cast<sockaddr*>(&clientAddress), &addressLength);
             if (client >= 0) {
-                g_servingEpoch = listenerEpoch;
-                diagnostic("accepted", client);
-                const char* closeReason = serveClient(client);
-                diagnostic(closeReason ? closeReason : "connection-closed", client);
-                closeSocket(client);
-                continue;
-            }
+                ClientSlot* slot = nullptr;
+                for (auto& entry : clients) if (entry.fd < 0) { slot = &entry; break; }
+                const int flags = ::fcntl(client,F_GETFL,0);
+                if (!slot || flags < 0 || ::fcntl(client,F_SETFL,flags | O_NONBLOCK) < 0 ||
+                    !sendAll(client,"SWITCHU 1\n","greeting-send")) closeSocket(client);
+                else { slot->fd = client; slot->session.start(monotonicMs()); }
+            } else
             if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
                 diagnostic("accept-failed", listener, errno, socketGetLastResult());
                 break;
@@ -591,9 +528,12 @@ void serverThread(void*) {
                 diagnostic("accept-polling", listener, errno, socketGetLastResult());
                 loggedPoll = true;
             }
+            for (auto& client : clients) pollClient(client);
             sleepPoll();
         }
+        for (auto& client : clients) if (client.fd >= 0) closeClient(client,"listener-reset");
         closeSocket(listener);
+        observer::launch::network_reset();
         if (g_wakeEpoch.load() != listenerEpoch) {
             diagnostic("wake-reinitializing-bsd");
             socketExit();
@@ -632,6 +572,7 @@ bool start(void (*wake)()) {
         if (g_started)
             return true;
         g_code = std::move(settings.code);
+        g_bootTick = armGetSystemTick();
         g_wake = wake;
         g_running.store(true);
         const auto created = ams::os::CreateThread(&g_thread, serverThread, nullptr,

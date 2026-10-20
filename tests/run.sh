@@ -30,6 +30,9 @@ build/tests/breeze_channel
 g++ "${flags[@]}" -Isource tests/codec_test.cpp -o build/tests/codec
 build/tests/codec
 
+g++ "${flags[@]}" -Isource tests/remote_session_test.cpp -o build/tests/remote_session
+build/tests/remote_session
+
 g++ "${flags[@]}" -Isource tests/forward_objects_test.cpp -o build/tests/forward_objects
 build/tests/forward_objects
 for component in protocol input touch capture; do
