@@ -337,7 +337,9 @@ Result replace_album(Connection& c, Service& holder, std::uint64_t& holder_gener
     if (R_FAILED(rc)) return rc;
     // AreAnyLibraryAppletsLeft may exclude the holder created through our
     // cloned session. Its live accessor is still the owned Album slot.
-    if (!occupied && !serviceIsActive(&holder)) return 0;
+    bool album_live = false;
+    { std::scoped_lock lock(mutex); album_live = latest_album() != nullptr; }
+    if (!occupied && !serviceIsActive(&holder) && !album_live) return 0;
     home::LibrarySnapshot snapshot;
     if (!home::library_snapshot(snapshot)) { startup(93, Busy); return Busy; }
     if (serviceIsActive(&holder) && holder.object_id != snapshot.object) { startup(94, Busy, snapshot.object); return Busy; }
@@ -445,14 +447,56 @@ __attribute__((noinline)) Result launch_nro(Connection& c, Service& holder, std:
     }
     return KERNELRESULT(TimedOut);
 }
+// Native Album accessors belong to qlaunch: borrow, never close their objects.
+bool manual_breeze(Connection& c, home::LibrarySnapshot& snapshot, std::uint64_t& generation) {
+    std::shared_ptr<Service> root;
+    std::uint32_t proxy = 0;
+    {
+        std::scoped_lock lock(mutex);
+        const auto* a = latest_album();
+        if (!a || !a->proxy || a->generation != proven || policy.pending()) return false;
+        root = a->service.lock(); proxy = a->proxy; generation = a->generation;
+    }
+    if (!root || !home::library_snapshot(snapshot) || snapshot.qlaunch != c.epoch) return false;
+    Service cloned{}, common{};
+    auto rc = serviceClone(root.get(), &cloned);
+    if (R_SUCCEEDED(rc)) {
+        auto applet = borrowed(cloned, proxy);
+        rc = child(&applet, 0, &common);
+    }
+    u8 focus = 0;
+    if (R_SUCCEEDED(rc)) rc = serviceDispatchOut(&common, 9, focus);
+    if (serviceIsActive(&common)) serviceClose(&common);
+    if (serviceIsActive(&cloned)) serviceClose(&cloned);
+    if (R_FAILED(rc) || focus != AppletFocusState_InFocus || !background_current(c,generation)) return false;
+    return home::matches_library(snapshot) && home::identify_breeze(generation,false,background_capable());
+}
 void worker(void*) {
     Connection connection;
     Service holder{};
     std::uint64_t ticket = 0, holder_generation = 0;
+    home::LibrarySnapshot manual_snapshot{};
+    std::uint64_t manual_generation = 0, manual_check = 0;
     for (;;) {
         auto time = now();
         const auto connected = connection.open();
         if (R_SUCCEEDED(connected)) background_tick(connection, holder, holder_generation);
+        if (manual_generation && (!home::matches_library(manual_snapshot) ||
+            !background_current(connection,manual_generation))) manual_generation = 0;
+        if (R_SUCCEEDED(connected) && !serviceIsActive(&holder)) {
+            if (!manual_generation && time >= manual_check) {
+                manual_check = time + 250;
+                std::uint64_t generation = 0;
+                if (manual_breeze(connection,manual_snapshot,generation)) {
+                    manual_generation = generation;
+                    startup(100,0,static_cast<std::uint32_t>(generation));
+                }
+            }
+            if (manual_generation) {
+                auto native = borrowed(connection.connection,manual_snapshot.object);
+                background_tick(connection,native,manual_generation);
+            }
+        }
         NativeIntent native{};
         bool handoff = false;
         {
@@ -638,14 +682,15 @@ void register_root(const std::shared_ptr<Service>& forward, std::uint64_t pid, b
         return;
     }
 }
-void bind_root(const void* session, std::uint64_t pid) {
+std::uint64_t bind_root(const void* session, std::uint64_t pid) {
     std::scoped_lock lock(mutex);
     Root* candidate = nullptr;
     for (auto& r : roots) if (r.pid == pid && !r.service.expired()) {
-        if (r.session == session) return;
+        if (r.session == session) return r.generation;
         if (!r.session && (!candidate || r.generation > candidate->generation)) candidate = &r;
     }
-    if (candidate) candidate->session = session;
+    if (candidate) { candidate->session = session; return candidate->generation; }
+    return 0;
 }
 void before_forward(const void* session, Kind kind, const Request& request) {
     if (request.closing || !request.valid) return;
@@ -708,60 +753,75 @@ void observe(const void* session, Kind kind, const Request& request, const Reply
         (request.command == 20 || request.command == 25 || request.command == 30 || (request.command == 1 && reply.scalar))) policy.cancel();
 }
 
-// Identity probe implementation lives on the existing BSD worker, never the AM relay.
+// Identity probes share the BSD lifetime, but never wait on the accept worker.
+namespace {
+struct IdentityProbe {
+    enum Phase { Connect, Greeting, AuthSend, AuthReply, StateSend, StateReply } phase{};
+    int fd = -1;
+    std::uint64_t generation{}, deadline{}, next{};
+    std::size_t sent{};
+    std::string line, output;
+    void close() { if (fd >= 0) ::close(fd); fd = -1; line.clear(); output.clear(); sent = 0; }
+    void writing(Phase value, std::string text) { phase = value; output = std::move(text); sent = 0; line.clear(); }
+} probe;
+}
+void network_reset() { probe.close(); }
 void network_tick(const char* pairing_code) {
-    static std::uint64_t next = 0;
     const auto time = now();
-    if (time < next) return;
-    next = time + 1000;
     std::uint64_t generation = 0;
     { std::scoped_lock lock(mutex); const auto* a = latest_album(); if (a && a->generation != proven) generation = a->generation; }
+    if (probe.fd >= 0 && (generation != probe.generation || time >= probe.deadline)) probe.close();
     if (!generation) return;
-    const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) return;
-    const auto flags = ::fcntl(fd, F_GETFL, 0);
-    if (flags < 0 || ::fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) { ::close(fd); return; }
-    const auto deadline = time + 500;
-    const auto pause = [&] { svcSleepThread(5'000'000ULL); };
-    sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(6801); address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    const auto line = [&](char* out, std::size_t size) {
-        for (std::size_t i = 0; i + 1 < size; ++i) {
-            ssize_t count = 0;
-            while (now() < deadline && (count = ::recv(fd, out + i, 1, 0)) < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) pause();
-            if (now() >= deadline || count != 1) return false;
-            if (out[i] == '\n') { out[i] = 0; return true; }
-        }
-        return false;
-    };
-    const auto send = [&](const char* text, std::size_t length) {
-        std::size_t offset = 0;
-        while (offset < length && now() < deadline) {
-            const auto count = ::send(fd, text + offset, length - offset, 0);
-            if (count > 0) offset += count;
-            else if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) pause();
-            else return false;
-        }
-        return offset == length;
-    };
-    char data[8192]{};
-    bool ok = ::connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0;
-    if (!ok && errno == EINPROGRESS) {
-        pollfd pending{fd, POLLOUT, 0};
-        while (now() < deadline && ::poll(&pending, 1, 5) == 0) {}
-        int error = -1; socklen_t size = sizeof(error);
-        ok = now() < deadline && ::getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) == 0 && error == 0;
+    if (probe.fd < 0) {
+        if (time < probe.next) return;
+        probe.next = time + 1000;
+        probe.fd = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (probe.fd < 0) return;
+        const auto flags = ::fcntl(probe.fd,F_GETFL,0);
+        if (flags < 0 || ::fcntl(probe.fd,F_SETFL,flags | O_NONBLOCK) < 0) { probe.close(); return; }
+        probe.generation = generation; probe.deadline = time + 1500;
+        sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(6801); address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        const auto rc = ::connect(probe.fd,reinterpret_cast<sockaddr*>(&address),sizeof(address));
+        if (rc < 0 && errno != EINPROGRESS) { probe.close(); return; }
+        probe.phase = rc == 0 ? IdentityProbe::Greeting : IdentityProbe::Connect;
     }
-    if (ok) ok = line(data, sizeof(data));
-    char auth[80]; const int count = std::snprintf(auth, sizeof(auth), "auth %s\n", pairing_code);
-    if (ok) ok = send(auth, count) && line(data, sizeof(data)) && std::strncmp(data, "+OK", 3) == 0;
-    if (ok) ok = send("state 1\n", 8) && line(data, sizeof(data));
-    ::close(fd);
-    // Current Breeze emits its version as the first root property. Fail closed
-    // for different schemas, busy replies, events and unauthenticated endpoints.
-    ok = ok && is_breeze_state(data);
-    if (ok) {
-        std::scoped_lock lock(mutex); const auto* a = latest_album();
-        if (a && a->generation == generation) proven = generation;
+    if (probe.phase == IdentityProbe::Connect) {
+        pollfd pending{probe.fd,POLLOUT,0};
+        if (::poll(&pending,1,0) <= 0) return;
+        int error = -1; socklen_t length = sizeof(error);
+        if (::getsockopt(probe.fd,SOL_SOCKET,SO_ERROR,&error,&length) < 0 || error) { probe.close(); return; }
+        probe.phase = IdentityProbe::Greeting;
+    }
+    if (probe.phase == IdentityProbe::AuthSend || probe.phase == IdentityProbe::StateSend) {
+        const auto count = ::send(probe.fd,probe.output.data()+probe.sent,probe.output.size()-probe.sent,0);
+        if (count > 0) probe.sent += count;
+        else if (count == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)) { probe.close(); return; }
+        if (probe.sent != probe.output.size()) return;
+        probe.phase = probe.phase == IdentityProbe::AuthSend ? IdentityProbe::AuthReply : IdentityProbe::StateReply;
+    }
+    char bytes[512];
+    const auto count = ::recv(probe.fd,bytes,sizeof(bytes),0);
+    if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) return;
+    if (count <= 0) { probe.close(); return; }
+    for (ssize_t i=0; i<count; ++i) {
+        if (bytes[i] != '\n') {
+            if (probe.line.size() >= 8191) { probe.close(); return; }
+            probe.line.push_back(bytes[i]); continue;
+        }
+        if (probe.phase == IdentityProbe::Greeting) {
+            probe.writing(IdentityProbe::AuthSend,std::string("auth ")+pairing_code+"\n"); return;
+        }
+        if (probe.phase == IdentityProbe::AuthReply) {
+            if (probe.line.compare(0,3,"+OK") != 0) { probe.close(); return; }
+            probe.writing(IdentityProbe::StateSend,"state 1\n"); return;
+        }
+        const bool ok = is_breeze_state(probe.line.c_str());
+        probe.close();
+        if (ok) {
+            std::scoped_lock lock(mutex); const auto* a = latest_album();
+            if (a && a->generation == generation) proven = generation;
+        }
+        return;
     }
 }
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include "trace.hpp"
+#include "forward_objects.hpp"
 #include "home_bridge.hpp"
 #include "boot.hpp"
 #include "launch_bridge.hpp"
@@ -14,18 +15,7 @@ using Context = ams::sf::cmif::ServiceDispatchContext;
 extern "C" ams::Result real_forward(const Session*, const Context&) asm("__real_" FORWARD_SYMBOL);
 extern "C" ams::Result observe_forward(const Session*, const Context&) asm("__wrap_" FORWARD_SYMBOL);
 namespace {
-struct Object { const Session* session{}; std::uint32_t id{}; observer::Kind kind{}; };
-Object objects[2048];
-observer::Kind kind(const Session* session, const observer::Request& r, bool root_open) {
-    for (const auto& o : objects) if (o.session == session && o.id == r.object) return o.kind;
-    return root_open ? observer::Kind::Root : observer::Kind::Unknown;
-}
-void remember(const Session* session, std::uint32_t id, observer::Kind k) {
-    for (auto& o : objects) if ((o.session == session && o.id == id) || o.session == nullptr) { o = {session, id, k}; return; }
-}
-void forget(const Session* session, std::uint32_t id) {
-    for (auto& o : objects) if (o.session == session && o.id == id) o = {};
-}
+observer::ForwardObjects objects;
 struct Bytes { const std::uint8_t* p{}; std::size_t size{}; };
 Bytes raw(const void* buffer, std::size_t size, const std::uint32_t* words, std::size_t count) {
     const auto start = reinterpret_cast<std::uintptr_t>(buffer);
@@ -42,9 +32,9 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
     const auto request = observer::request(in.p, in.size);
     if (request.valid && observer::root_open(request.command, ctx.request.meta.send_pid, ctx.request.meta.num_copy_handles)) {
         observer::home::bind_root(session, ctx.request.pid);
-        observer::launch::bind_root(session, ctx.request.pid);
+        objects.begin(session, observer::launch::bind_root(session, ctx.request.pid));
     }
-    const auto interface = request.valid ? kind(session, request,
+    const auto interface = request.valid ? objects.kind(session, request.object,
         observer::root_open(request.command, ctx.request.meta.send_pid, ctx.request.meta.num_copy_handles)) : observer::Kind::Unknown;
     const auto child_kind = observer::returned_kind(interface, request.command);
     observer::Record record;
@@ -70,7 +60,7 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
     if (R_SUCCEEDED(transport) && request.closing) {
         observer::home::observe(session, interface, request, {});
         observer::launch::observe(session, interface, request, {});
-        forget(session, request.object);
+        objects.forget(session, request.object);
     }
     if (R_SUCCEEDED(transport) && request.valid && !request.closing) {
         const auto response = hipcParseResponse(ams::sf::hipc::GetMessageBufferOnTls());
@@ -98,7 +88,7 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
                 observer::launch::request_stock_home(session);
             }
             if (reply.object && child_kind != observer::Kind::Unknown) {
-                remember(session, reply.object, child_kind); record.child = reply.object;
+                objects.remember(session, reply.object, child_kind); record.child = reply.object;
             }
             if (reply.result == 0 && interface == observer::Kind::StorageAccessor && request.command == 11 && request.argument == 0 && request.argument_high == 0) {
                 // Read only the SAMS header already returned to qlaunch. No
@@ -122,7 +112,7 @@ extern "C" ams::Result observe_forward(const Session* session, const Context& ct
             }
             if (interface == observer::Kind::Common && request.command == 1 && reply.result == ((3u << 9) | 128u)) return transport;
         }
-        if (interface == observer::Kind::Root) remember(session, request.object, interface);
+        if (interface == observer::Kind::Root) objects.remember(session, request.object, interface);
         if (response.num_move_handles && child_kind != observer::Kind::Unknown) record.flags |= 0x20; // child-session coverage gap
     }
     observer::push(record); // fixed ring only; no filesystem IPC on this TLS
