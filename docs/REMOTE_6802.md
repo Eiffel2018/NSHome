@@ -1,6 +1,6 @@
 # Python examples and TCP 6802 reference
 
-This reference describes the current NSHome source (0.1.9), not
+This reference describes the current NSHome source (0.1.12), not
 all features of other servers using the same banner. Each feature has a runnable
 [Python sample](../samples/README.md). Python 3.10+ is sufficient; no pip packages
 are required. The shared implementation is [tools/nshome_remote.py](../tools/nshome_remote.py).
@@ -62,6 +62,8 @@ authenticated connection for each command.
 | [15_start_game.py](../samples/15_start_game.py) | Required `--title-id` exactly 16 hex digits, nonzero value, no 0x prefix | `gamestart TITLE_ID` -> `OK queued ID`; automatic user/Breeze flow; bounded launch, background BP/stepping and HOME checks passed |
 | [16_home_button.py](../samples/16_home_button.py) | `--ms` 1..1000 default 100 | `press HOME MS`; presses HOME, does not enable HOME switching |
 | [17_capture_button.py](../samples/17_capture_button.py) | `--ms` 1..1000 default 100 | `press CAPTURE MS`; console Album workflow, no JPEG response to PC |
+| [18_installed_titles.py](../samples/18_installed_titles.py) | `--page-size` 1..16, `--wait` 1..120 seconds | `titles refresh/status/page`; validated read-only snapshot |
+| [19_stop_game.py](../samples/19_stop_game.py) | Required `--title-id`, exact running 16-digit hex ID | `gamestop TID` -> `OK queued ID`; poll the same ID until `finished`/`failed` |
 
 Main buttons (single or chord): `A B X Y LSTICK RSTICK L R ZL ZR PLUS MINUS
 LEFT UP RIGHT DOWN`. Other supported single buttons: `HOME CAPTURE LSL LSR RSL RSR`.

@@ -40,4 +40,8 @@ No Nintendo code, firmware, keys, fonts or user configuration are included.
   its dual license. Unmodified source/stb_image.h retains the complete license.
   Upstream: https://github.com/nothings/stb (stb_image.h v2.30);
   SHA256 1f8c1b6b408f26e3b20cbfbbd4758afb3dc9b837ff1e17c258928f406148a87c.
-  Only its JPEG memory decoder is compiled for startup screen validation.
+  Only its JPEG memory decoder is compiled for startup and native Close screen validation.
+- tomvita/Breeze-Beta, user-supplied Breeze beta126 desktop package, GPL-3.0:
+  tools/breezepc/ is a separate Python desktop program, with its own LICENSE
+  and upstream/file hashes in UPSTREAM.json. NSHome control, capture, launch
+  and native Stop integration are adapted from the earlier desktop port.

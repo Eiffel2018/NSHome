@@ -1,9 +1,9 @@
 # Installed application catalogue (6802 schema 1)
 
-Available in 0.1.11 development source. Native build and offline tests are the
-validation boundary until a console check is recorded. This is a read-only
+Available in the installed 0.1.11 candidate. A bounded console check on
+2026-10-20 read 58 applications using three-item pages and rejected a stale
+generation. The public 0.1.9 ZIP does not have this API. This is a read-only
 interface; it never starts/stops a game or changes a user, cheat or SD file.
-The current installed 0.1.10 build and public 0.1.9 ZIP do not have this API.
 
 ## Installation evidence
 

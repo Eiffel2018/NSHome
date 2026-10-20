@@ -1,0 +1,42 @@
+NSHome 0.1.12 - experimental preview
+
+INSTALL
+1. Use an existing Atmosphere installation with original Nintendo HOME.
+   Disable/remove an existing SwitchU HOME replacement before installing.
+2. Install Breeze separately as switch/Breeze/Breeze.nro. Enable PC connect
+   in Breeze Settings and choose your own pairing code, then restart Breeze.
+3. Copy ONLY the atmosphere and switch folders from this ZIP to the SD root.
+   Keep the included module and breeze_loader files together. Reboot the console.
+
+USE WITHOUT A PC
+Start a game normally, open Album/hbmenu and launch Breeze.
+HOME switches between the game and the same Breeze process.
+From Breeze's main menu, B returns to hbmenu. HOME leaves the applet.
+After a PC-launched Breeze, an extra HOME press may be needed to reach stock HOME.
+You can also run ReturnToHOME from hbmenu.
+
+OPTIONAL STARTUP UNLOCK
+Copy the config folder inside extras/auto-unlock to the SD root, then reboot.
+This enables one visually checked startup touch; it is not enabled by default.
+See INSTALL.md for disabling it and restoring the system lock-screen setting.
+
+PC CONTROL (OPTIONAL)
+TCP 6802: controls, touch, capture, NRO/game launch, native HOME game close,
+installed application list.
+Breeze TCP 6801: existing files, memory and debugger functions.
+For the corrected Stop game button, use the separate matching
+BreezePC-beta126-NSHome-v0.1.12.zip download. Close and reopen BreezePC after
+updating. Original 6801 clients are unchanged. Stop uses the observed stock
+1280x720 HOME layout and fails without confirming an unknown screen.
+Python examples and parameters are in samples/README.md. A PC is not required
+for ordinary HOME switching. No pairing code is included in this ZIP.
+
+LIMITATIONS / REMOVAL
+Experimental; other firmware/games and sleep/wake are not fully verified.
+The beta126 UI/network check did not repeat BP/trace validation.
+Read INSTALL.md and docs/LAUNCH.md for the precise tested scope.
+To uninstall or recover from a boot problem, power off and remove
+atmosphere/contents/00FF4E5348414D01 using SD access.
+
+Source and GPL-2.0 license are included. Breeze, gen2, Atmosphere, firmware,
+keys and user settings are not bundled.

@@ -1,13 +1,14 @@
-# NSHome 0.1.9 installation
+# NSHome 0.1.12 installation
 
-Experimental release, tested on one console with Breeze beta125.05 and gen2 v0.20.
+Experimental release. UI/network checks used Breeze beta126.00; earlier
+BP/trace checks used beta125.05 and gen2 v0.20 on one console.
 Other firmware/game combinations are not yet verified.
 
 ## Requirements and installation
 
 1. Use an existing Atmosphere setup with original Nintendo qlaunch. Disable any
    SwitchU HOME daemon/replacement before installing NSHome, then reboot.
-2. Install [Breeze](https://github.com/tomvita/Breeze-Beta/releases/tag/beta125.05)
+2. Install [Breeze](https://github.com/tomvita/Breeze-Beta/releases)
    separately at `switch/Breeze/Breeze.nro`. Enable PC connect in its Settings
    and choose your own pairing code. NSHome reads the same `[PC connect]`
    settings from `switch/Breeze/config.ini`; restart after changing them.
@@ -24,7 +25,11 @@ firmware or pairing settings.
 
 ## Start a game and switch HOME
 
-From the extracted ZIP, use Python 3.10+:
+For normal console use, start a game as usual, open Album/hbmenu and launch
+Breeze. NSHome pairs HOME automatically: press HOME to return to the game and
+again to return to the same Breeze. No PC or Python setup is needed for this.
+
+For optional PC automation, use Python 3.10+ from the extracted ZIP:
 
 ```sh
 python samples/15_start_game.py --host SWITCH_IP --title-id YOUR_16_DIGIT_TITLE_ID
@@ -41,6 +46,20 @@ keep their native behavior. Use sample 14 with `--path /switch/Breeze/Breeze.nro
 to open Breeze directly, or another existing SD NRO path. Follow the queued request
 with sample 02 rather than resending it.
 [6802 samples and parameters](REMOTE_6802.md) cover all commands.
+
+## PC Stop game
+
+Use the matching `BreezePC-beta126-NSHome-v0.1.12.zip` desktop companion from
+the release, or sample 19 with the running game's exact title ID. Close and
+reopen an existing BreezePC window after updating. The Stop button sends one
+6802 request, follows its receipt and reconnects after Breeze reopens.
+
+NSHome closes through original HOME's X/Close confirmation, checking the game,
+foreground and screen before each input. The observed stock 1280x720 layout is
+required. Unknown layouts fail without confirming; there is no force-kill fallback.
+This passed from both game and Breeze foreground with beta126.00. Unsaved progress
+can be lost. Unmodified clients that send Breeze's raw 6801 `gamestop` retain
+their original behavior; that command is not redirected by NSHome.
 
 ## Background BP and trace
 
@@ -60,14 +79,14 @@ alone does not restore that setting. Other boot screen layouts are unverified.
 
 ## Returning to stock HOME
 
-Known issue: after leaving the owned Breeze for hbmenu, HOME and `+` may fail
-to return to qlaunch. `home off` only disables HOME interception; it does not
-close the retained applet. The optional [Return to HOME NRO](../tools/return_to_home/README.md)
-uses the library-applet exit path. It passed a device check from NSHome's
-retained hbmenu to stock qlaunch and System Settings, with the game retained.
-Version 0.1.9 includes the tool under `switch/`; copy that folder to the SD
-root too. Reboot remains a
-recovery option if the tool is unavailable.
+From Breeze's main menu, B returns to hbmenu. Press HOME to leave the applet.
+Native Album checks reached stock qlaunch directly; after a PC-launched Breeze,
+the first HOME can return to the game and the next HOME reaches qlaunch.
+`home off` alone only disables interception and does not close the applet.
+
+The included `switch/ReturnToHOME.nro` provides an explicit return through the
+library-applet exit path. Run it from hbmenu. A normal reboot is a recovery
+option if returning still fails.
 
 ## Limits and removal
 
@@ -76,7 +95,6 @@ launch and retained-Breeze relaunch. A ten-minute trace completed, including
 resolution of two late UI replies; it mostly remained in one instruction loop.
 Sleep/wake, other game applets and general exit/chainload remain unverified.
 See [validation limits](LAUNCH.md).
-The existing 6801 Stop game command can display Nintendo's software-closed dialog.
 Never replay an input or launch whose outcome is unknown.
 
 Logs are under `config/NSHome/`. To uninstall or recover from a boot problem,

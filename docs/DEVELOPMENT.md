@@ -6,6 +6,8 @@ Run `bash tests/run.sh`, then `bash build.sh` with `AMS_LIBRARIES` and
 `DEVKITPRO` set. Dependency revisions are pinned in the root README.
 Package with `python3 package.py /absolute/path/to/NSHome.zip`.
 The build checks executable/container formats, module ID, forwarding and allocation.
+Version 0.1.12 was built locally with devkitA64 r30 (GCC 16.1) and the pinned
+dependencies. Keep the non-LTO Atmosphere library settings in `build.sh`.
 All newlib reentrant allocation entry points, including `_memalign_r` used by
 stdio aligned buffers, must route to Stratosphere. The default newlib memalign
 implementation edits malloc chunk metadata and cannot use Stratosphere pointers;
