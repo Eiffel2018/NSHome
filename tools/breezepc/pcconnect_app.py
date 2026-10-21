@@ -32,8 +32,8 @@ The last ip and code are remembered in ~/.breeze_pc.json.
   of the list is the save in the other place, so a save can be carried over
   from the console to the SD card or back. With the box unticked a snapshot
   can only be taken while the game is closed.
-- Stop game ends the running game at once, as if it had crashed: anything it
-  has not saved is lost. Start game offers recent games or a manually entered TID; Breeze closes
+- Stop game asks NSHome to close the identified game through the normal HOME
+  menu flow over 6802. Start game offers recent games or a manually entered TID; Breeze closes
   to let it start and comes back the way it does after any exit (press HOME
   if it does not). Together with Restore: Stop game, Restore, Start game.
 - Game input sends the keyboard and a Windows controller to the game instead
@@ -1841,7 +1841,7 @@ class App:
         ready = j.get("committed") if on else (j.get("nand_users") and not j.get("game_running"))
         self.snap_btn.config(state="normal" if ready else "disabled")
         self.restore_btn.config(state="normal" if snaps or self.other_save() else "disabled")
-        self.stop_btn.config(state="normal" if j.get("game_running") else "disabled")
+        self.stop_btn.config(state="normal" if j.get("game_running") and not self.switchu_busy else "disabled")
         self.start_btn.config(state="disabled" if j.get("game_running") else "normal")
         if not on:
             text = "off: the save is inside the console%s" % (
@@ -1958,9 +1958,40 @@ class App:
             pass
 
     def on_stop_game(self):
-        if messagebox.askokcancel("Stop game", "Stop the game now?\n\nIt ends at once, as if it had crashed: "
-                                  "anything it has not saved is lost.", parent=self.root):
-            self.link.send("gamestop")
+        j = self.save or {}
+        tid = valid_tid(j.get("title_id"))
+        if not tid:
+            messagebox.showerror("Stop game", "The running game's Title ID is not available.", parent=self.root)
+            return
+        if messagebox.askokcancel("Stop game", "Close the game through NSHome's normal HOME menu flow?\n\n"
+                                  "Unsaved progress may be lost.", parent=self.root):
+            self.send_switchu_stop_game(tid)
+
+    def send_switchu_stop_game(self, tid):
+        if self.switchu_busy:
+            self.status.config(text="A NSHome / SwitchU request is pending; no game close was sent.")
+            return
+        self.switchu_busy = True
+        self._set_switchu_buttons()
+        self.status.config(text="Closing game through NSHome 6802 and the normal HOME menu flow...")
+        threading.Thread(target=self._switchu_stop_game_worker,
+                         args=(self.switchu_generation, self.cfg["host"], self.cfg["code"], tid),
+                         daemon=True).start()
+
+    def _switchu_stop_game_worker(self, generation, host, code, tid):
+        try:
+            receipt = switchu_remote.stop_game(host, code, tid)
+            number = switchu_remote.request_id(receipt)
+            observed = switchu_remote.wait_for_request(host, code, number, deadline=20)
+            finished = (switchu_remote.request_id(observed) == number
+                        and switchu_remote.status_state(observed) == "finished")
+            message = ("Game closed through NSHome 6802; waiting for Breeze to reconnect." if finished else
+                       "NSHome / SwitchU game close request: %s. It was not resent." % observed)
+        except switchu_remote.AmbiguousLaunchError as exc:
+            message = "Game close result is unknown: %s. Check NSHome / SwitchU status; it was not resent." % exc
+        except (switchu_remote.RemoteError, ValueError) as exc:
+            message = "NSHome / SwitchU game close: %s. It was not resent." % exc
+        self.out.put(("switchu_remote", generation, True, message))
 
     def on_start_game(self):
         if self.save and self.save.get("game_running"):

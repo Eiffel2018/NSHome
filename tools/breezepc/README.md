@@ -17,10 +17,9 @@ Changes relative to the original beta126 desktop UI:
 - Screen capture through 6802, falling back to Breeze's original 6801 capture.
 - Start game through 6802, recent-title history and manual Title ID entry.
 - Virtual-input handoff with the existing Breeze Game input and explicit OFF.
-- Stop game retains upstream's 6801 `gamestop`. With NSHome 0.1.13+, the console
-  redirects the verified Breeze/game termination to original HOME Close and
-  restarts Breeze; this PC reconnects automatically. Original beta126 BreezePC
-  works too, without any of this companion's changes.
+- Stop game uses NSHome's 6802 `gamestop` request. The console closes the
+  identified game through the original HOME Close flow and reopens Breeze;
+  Breeze's 6801 terminate command is not used by this button.
 
 Beta126's 15 FPS default, 30 FPS selector and 6801 capture-ahead scheduling are
 retained. The independent 6802 picture worker remains capped at 10 FPS.
