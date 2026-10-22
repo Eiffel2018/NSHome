@@ -41,7 +41,7 @@ public:
 namespace ams {
 ncm::ProgramId CurrentProgramId = observer::ProgramId;
 namespace init {
-    alignas(0x1000) constinit std::uint8_t heap[0x800000];
+    alignas(0x1000) constinit std::uint8_t heap[0x400000];
     void InitializeSystemModule() { InitializeAllocator(heap, sizeof(heap)); R_ABORT_UNLESS(sm::Initialize()); }
     void FinalizeSystemModule() {}
     void Startup() {}
